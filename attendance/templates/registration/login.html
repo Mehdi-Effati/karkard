@@ -1,0 +1,41 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ورود — تقویم کاری</title>
+  <meta name="theme-color" content="#0d6b48">
+  <link rel="manifest" href="{% static 'attendance/manifest.json' %}">
+  <link rel="icon" href="{% static 'attendance/icons/icon-192.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'attendance/icons/icon-192.png' %}">
+  <link rel="stylesheet" href="{% static 'attendance/css/style.css' %}">
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-card">
+      <div class="mark">TK</div>
+      <h1>ورود به تقویم کاری</h1>
+      <p class="sub">برای مشاهده و ثبت وضعیت روزهای کاری‌تان وارد شوید.</p>
+
+      {% if form.errors %}
+        <div class="login-error">نام کاربری یا رمز عبور اشتباه است.</div>
+      {% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="login-field">
+          <label for="id_username">نام کاربری</label>
+          <input type="text" name="username" id="id_username" autofocus required>
+        </div>
+        <div class="login-field">
+          <label for="id_password">رمز عبور</label>
+          <input type="password" name="password" id="id_password" required>
+        </div>
+        <input type="hidden" name="next" value="{{ next }}">
+        <button type="submit" class="login-submit">ورود</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

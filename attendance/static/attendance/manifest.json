@@ -1,0 +1,27 @@
+{
+  "name": "تقویم کاری",
+  "short_name": "کارکرد",
+  "description": "تقویم کاری و ثبت وضعیت روزانه کارمندان",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12283f",
+  "theme_color": "#0d6b48",
+  "dir": "rtl",
+  "lang": "fa",
+  "icons": [
+    {
+      "src": "/static/attendance/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/attendance/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

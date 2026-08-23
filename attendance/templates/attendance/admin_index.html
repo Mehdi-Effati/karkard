@@ -1,0 +1,12 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+<div style="direction:rtl; margin-bottom:18px;">
+  <a href="{% url 'management_dashboard' %}"
+     style="display:inline-block; background:#0d6b48; color:#fff; padding:10px 18px;
+            border-radius:8px; text-decoration:none; font-weight:700; font-size:13.5px;">
+    📊 پنل حسابداری و کارکرد کارمندان
+  </a>
+</div>
+{{ block.super }}
+{% endblock %}

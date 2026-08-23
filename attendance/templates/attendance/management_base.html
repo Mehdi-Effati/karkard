@@ -1,0 +1,7 @@
+{% load static %}
+<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{% block title %}پنل مدیریت کارکرد{% endblock %}</title><link rel="stylesheet" href="{% static 'attendance/css/management.css' %}"></head>
+<body>
+<div class="admin-shell">
+<aside class="sidebar"><div class="brand"><span class="brand-mark">ک</span><div><b>کارکرد</b><small>پنل حسابداری</small></div></div><nav><a href="{% url 'management_dashboard' %}">داشبورد کارکرد</a><a href="{% url 'management_employees' %}">کارمندان</a><a href="{% url 'admin:index' %}">پنل فنی Django</a></nav><div class="side-user"><span>{{ request.management_user.get_full_name|default:request.management_user.username }}</span><form method="post" action="{% url 'management_logout' %}">{% csrf_token %}<button type="submit">خروج</button></form></div></aside>
+<main class="main"><header class="mobile-head"><b>پنل حسابداری</b><a href="{% url 'management_employees' %}">کارمندان</a></header>{% block content %}{% endblock %}</main></div>
+</body></html>

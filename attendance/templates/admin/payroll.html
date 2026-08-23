@@ -1,0 +1,93 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}کارکرد کارمندان — {{ month_name }} {{ jy }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">خانه</a>
+  &rsaquo; کارکرد کارمندان
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .payroll-wrap { direction: rtl; font-family: inherit; }
+  .payroll-nav { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+  .payroll-nav a.navlink {
+    padding:6px 14px; border-radius:8px; border:1px solid #4a5568;
+    text-decoration:none; color:#ffffff !important; background:#2d3748;
+  }
+  .payroll-nav a.navlink:hover { background:#3f4b5f; }
+  .payroll-nav .title { font-size:20px; font-weight:700; color:#ffffff; }
+  table.payroll-table { width:100%; border-collapse:collapse; background:#ffffff; color:#1c2430; }
+  table.payroll-table th, table.payroll-table td {
+    border:1px solid #ddd; padding:9px 10px; text-align:center; font-size:13px;
+    color:#1c2430; background:#ffffff;
+  }
+  table.payroll-table th { background:#f1f3f4; font-weight:700; color:#1c2430; }
+  table.payroll-table td.emp-name { text-align:right; font-weight:600; }
+  .empty-note { color:#666; padding:20px; text-align:center; }
+  .dept-filter { margin-inline-start:auto; }
+  .dept-filter select {
+    padding:7px 10px; border-radius:8px; border:1px solid #4a5568;
+    background:#2d3748; color:#fff; font-family:inherit; font-size:13px;
+  }
+</style>
+
+<div class="payroll-wrap">
+  <div class="payroll-nav">
+    <a class="navlink" href="?y={{ prev_y }}&amp;m={{ prev_m }}{% if selected_dept %}&amp;dept={{ selected_dept }}{% endif %}">&lsaquo; ماه قبل</a>
+    <div class="title">{{ month_name }} {{ jy }}</div>
+    <a class="navlink" href="?y={{ next_y }}&amp;m={{ next_m }}{% if selected_dept %}&amp;dept={{ selected_dept }}{% endif %}">ماه بعد &rsaquo;</a>
+
+    {% if departments %}
+      <form method="get" class="dept-filter">
+        <input type="hidden" name="y" value="{{ jy }}">
+        <input type="hidden" name="m" value="{{ jm }}">
+        <select name="dept" onchange="this.form.submit()">
+          <option value="">همه بخش‌ها</option>
+          {% for dept in departments %}
+            <option value="{{ dept.id }}" {% if selected_dept == dept.id|stringformat:"s" %}selected{% endif %}>{{ dept.name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    {% endif %}
+  </div>
+
+  {% if rows %}
+    <table class="payroll-table">
+      <thead>
+        <tr>
+          <th>کارمند</th>
+          <th>بخش</th>
+          <th>روزکاری</th>
+          <th>شب‌کاری</th>
+          <th>تعطیل‌کاری</th>
+          <th>جمعه‌کاری</th>
+          <th>مرخصی</th>
+          <th>Off</th>
+          <th>ساعت اضافه‌کاری</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <td class="emp-name">{{ row.employee.first_name|default:row.employee.username }}</td>
+            <td>{{ row.department|default:"—" }}</td>
+            <td>{{ row.stats.work }}</td>
+            <td>{{ row.stats.night }}</td>
+            <td>{{ row.stats.holiday_work }}</td>
+            <td>{{ row.stats.friday_work }}</td>
+            <td>{{ row.stats.leave }}</td>
+            <td>{{ row.stats.off }}</td>
+            <td>{{ row.stats.overtime_hours }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty-note">هیچ کارمندی (کاربر غیرادمین) در سیستم ثبت نشده است.</p>
+  {% endif %}
+</div>
+{% endblock %}
