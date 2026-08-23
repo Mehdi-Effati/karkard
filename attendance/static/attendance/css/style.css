@@ -870,3 +870,9 @@ body {
   border-top-color: #64748b !important;
 }
 .day-cell.is-holiday.st-off .day-number { color: var(--c-off) !important; }
+.stat-item.c-deduction .num { color: #ef6c4f; }
+.approval-dot{position:absolute;left:6px;bottom:6px;width:17px;height:17px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;background:rgba(255,255,255,.9);box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.day-cell{position:relative}.approval-dot.approved{color:#15803d}.approval-dot.pending{color:#d97706}.approval-dot.rejected{color:#dc2626}
+.deduction-panel{max-width:none;margin-bottom:18px}.deduction-form{display:grid;grid-template-columns:160px 160px 1fr auto;gap:8px}.deduction-form input{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:10px;padding:10px;font:inherit}.deduction-form input::placeholder{color:rgba(255,255,255,.65)}
+@media(max-width:700px){.deduction-form{grid-template-columns:1fr}.deduction-form button{width:100%}}
+.calendar-messages{max-width:1040px;margin:14px auto 0;padding:0 20px}.calendar-message{background:rgba(16,185,129,.18);border:1px solid rgba(52,211,153,.35);color:#d1fae5;border-radius:12px;padding:10px 14px;font-size:12px}

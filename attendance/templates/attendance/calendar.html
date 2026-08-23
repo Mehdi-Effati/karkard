@@ -24,6 +24,8 @@
     </div>
   </div>
 
+  {% if messages %}<div class="calendar-messages">{% for message in messages %}<div class="calendar-message">{{ message }}</div>{% endfor %}</div>{% endif %}
+
   <div class="wrap">
     <div class="month-nav">
       <a class="nav-btn" href="?y={{ prev_y }}&m={{ prev_m }}" title="ماه قبل">‹</a>
@@ -48,10 +50,17 @@
           <div class="stat-item c-friday"><div class="num">{{ stats.friday_work }}</div><div class="lbl">جمعه‌کاری</div></div>
           <div class="stat-item c-leave"><div class="num">{{ stats.leave }}</div><div class="lbl">مرخصی</div></div>
           <div class="stat-item c-off"><div class="num">{{ stats.off }}</div><div class="lbl">Off</div></div>
-          <div class="stat-item c-overtime"><div class="num">{{ stats.overtime_hours }}</div><div class="lbl">ساعت اضافه‌کاری</div></div>
+          <div class="stat-item c-overtime"><div class="num">{{ stats.overtime_hours }}</div><div class="lbl">ساعت اضافه‌کاری</div></div><div class="stat-item c-deduction"><div class="num">{{ deduction_total }}</div><div class="lbl">کسر حقوق</div></div>
         </div>
       </div>
     </div>
+
+    {% if can_self_add_deduction %}
+    <div class="glass-panel deduction-panel">
+      <h4>ثبت کسر حقوق برای خودم</h4>
+      <form method="post" action="{% url 'employee_add_self_deduction' %}" class="deduction-form">{% csrf_token %}<input name="amount" inputmode="numeric" placeholder="مبلغ" required><input type="date" name="date"><input name="reason" placeholder="دلیل کسر حقوق" required><button class="btn btn-primary" type="submit">ثبت کسر حقوق</button></form>
+    </div>
+    {% endif %}
 
     <div class="legend">
       <span class="item"><span class="swatch" style="border-color:var(--c-work)"></span> روز کاری</span>
@@ -82,10 +91,10 @@
                    data-overtime="{{ day.overtime_hours }}"
                    data-note="{{ day.note }}"
                    data-holiday="{{ day.holiday_title }}" data-holiday-kind="{{ day.holiday_kind }}"
-                   data-checked="{% if day.checked %}1{% else %}0{% endif %}"
+                   data-checked="{% if day.checked %}1{% else %}0{% endif %}" data-approval="{{ day.approval_status }}"
                    {% if day.holiday_title %}title="تعطیل رسمی: {{ day.holiday_title }}"{% endif %}>
                 {% if day.holiday_title %}<div class="holiday-dot {% if day.holiday_kind == 'government' %}government{% endif %}"></div>{% endif %}
-                {% if day.note %}<div class="note-dot" title="یادداشت دارد">📝</div>{% endif %}
+                {% if day.note %}<div class="note-dot" title="یادداشت دارد">📝</div>{% endif %}{% if day.approval_status == 'approved' %}<div class="approval-dot approved" title="تایید شده">✓</div>{% elif day.approval_status == 'rejected' %}<div class="approval-dot rejected" title="رد شده">!</div>{% elif day.approval_status == 'pending' %}<div class="approval-dot pending" title="در انتظار تایید">•</div>{% endif %}
                 <div class="day-number">{{ day.jalali_day }}</div>
                 <div class="gdate">{{ day.gregorian }}</div>
                 <input type="checkbox" class="day-check" autocomplete="off" {% if day.checked %}checked{% endif %}>

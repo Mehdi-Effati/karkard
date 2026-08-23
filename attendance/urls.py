@@ -12,4 +12,5 @@ urlpatterns = [
     path('', views.calendar_view, name='calendar'),
     path('api/day/save/', views.save_day, name='save_day'),
     path('api/day/delete/', views.delete_day, name='delete_day'),
+    path('api/deduction/self/', views.employee_add_self_deduction, name='employee_add_self_deduction'),
 ]

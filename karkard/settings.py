@@ -18,7 +18,7 @@ if _ENV_FILE.exists():
         os.environ.setdefault(_key.strip(), _value.strip())
 
 # در محیط تولید حتما این مقدار را عوض کنید و DEBUG را False بگذارید
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in {'1', 'true', 'yes', 'on'}
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() in {'1', 'true', 'yes', 'on'}
 
 _secret_key = os.environ.get('DJANGO_SECRET_KEY', '').strip()
 if not _secret_key:
@@ -44,6 +44,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'attendance.middleware.ManagementIdentityMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',

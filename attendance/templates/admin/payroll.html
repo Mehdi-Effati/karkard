@@ -68,6 +68,7 @@
           <th>مرخصی</th>
           <th>Off</th>
           <th>ساعت اضافه‌کاری</th>
+          <th>کسر حقوق</th>
         </tr>
       </thead>
       <tbody>
@@ -82,6 +83,7 @@
             <td>{{ row.stats.leave }}</td>
             <td>{{ row.stats.off }}</td>
             <td>{{ row.stats.overtime_hours }}</td>
+            <td>{{ row.deduction_total }}</td>
           </tr>
         {% endfor %}
       </tbody>

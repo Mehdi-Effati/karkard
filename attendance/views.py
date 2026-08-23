@@ -5,12 +5,15 @@ from decimal import Decimal, InvalidOperation
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model, logout, authenticate
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
+from django.db import transaction
+from django.contrib import messages
+from django.utils import timezone
 from django.core import signing
 from functools import wraps
 from django.conf import settings
@@ -24,7 +27,10 @@ from .jalali import (
     jalali_weekday,
     today_jalali,
 )
-from .models import Department, Holiday, WorkDay
+from .models import (
+    Department, Holiday, WorkDay, EmployeeProfile, SalaryDeduction,
+    MANAGEMENT_PERMISSION_KEYS,
+)
 
 VALID_STATUSES = {choice[0] for choice in WorkDay.STATUS_CHOICES}
 
@@ -101,15 +107,42 @@ def _holiday_map_for_month(jy, jm):
 MANAGEMENT_COOKIE = 'attendance_management_auth'
 MANAGEMENT_COOKIE_SALT = 'attendance.management-auth'
 
-def _is_management_admin(user):
-    """Only real administrators may use the separate management area.
+def _is_management_user(user):
+    """Return True for a Django superuser or a designated accountant.
 
-    A normal Django staff flag is intentionally NOT sufficient.  The
-    management area contains cross-employee data and therefore requires an
-    active superuser.  Accounts created through the AdminAccount proxy are
-    also created as staff + superuser.
+    Accountants deliberately do NOT become Django staff/superusers. They remain
+    ordinary employees for the employee calendar, while a separate signed
+    management cookie grants only the management permissions assigned to them.
     """
-    return bool(user and user.is_active and user.is_staff and user.is_superuser)
+    if not user or not user.is_active:
+        return False
+    if user.is_superuser:
+        return True
+    profile = getattr(user, 'employee_profile', None)
+    return bool(profile and profile.is_accountant)
+
+
+def _is_management_admin(user):
+    # Backwards-compatible alias used by a few existing callers/tests.
+    return _is_management_user(user)
+
+
+def _effective_management_permissions(user):
+    if not _is_management_user(user):
+        return []
+    if user.is_superuser:
+        return list(MANAGEMENT_PERMISSION_KEYS)
+    profile = getattr(user, 'employee_profile', None)
+    if not profile:
+        return []
+    # An accountant with an empty permission list gets the default full access.
+    # This keeps the role safe for existing records created before granular
+    # permissions were introduced.
+    return list(profile.management_permissions or MANAGEMENT_PERMISSION_KEYS)
+
+
+def _management_permission(user, permission):
+    return permission in _effective_management_permissions(user)
 
 
 def _safe_next_url(request, candidate):
@@ -127,8 +160,8 @@ def _get_management_user(request):
     if not raw:
         return None
     try:
-        user = get_user_model().objects.get(pk=int(raw), is_active=True, is_staff=True, is_superuser=True)
-        return user if _is_management_admin(user) else None
+        user = get_user_model().objects.select_related('employee_profile').get(pk=int(raw), is_active=True)
+        return user if _is_management_user(user) else None
     except (ValueError, TypeError, get_user_model().DoesNotExist):
         return None
 
@@ -140,28 +173,42 @@ def management_required(view):
             from urllib.parse import urlencode
             login_url = reverse('management_login')
             return redirect(f"{login_url}?{urlencode({'next': request.get_full_path()})}")
-        # Management has its own authentication realm. Never use request.user
-        # (the employee Django session) to render or authorize management pages.
         request.management_user = management_user
         return view(request, *args, **kwargs)
     return wrapped
 
+
+def management_permission_required(permission):
+    def decorator(view):
+        @wraps(view)
+        def wrapped(request, *args, **kwargs):
+            management_user = _get_management_user(request)
+            if not management_user:
+                from urllib.parse import urlencode
+                login_url = reverse('management_login')
+                return redirect(f"{login_url}?{urlencode({'next': request.get_full_path()})}")
+            request.management_user = management_user
+            if not _management_permission(management_user, permission):
+                return render(request, 'attendance/management/forbidden.html', {
+                    'required_permission': permission,
+                }, status=403)
+            return view(request, *args, **kwargs)
+        return wrapped
+    return decorator
+
 def calendar_access_required(view):
     @wraps(view)
     def wrapped(request, *args, **kwargs):
-        if request.user.is_authenticated or _get_management_user(request):
+        if request.user.is_authenticated or _get_view_as_user(request):
             return view(request, *args, **kwargs)
         return redirect('login')
     return wrapped
 
 def _calendar_actor(request):
-    # Management and employee authentication are separate realms. If a valid
-    # management authentication cookie exists, it is the actor for management
-    # navigation, even when an employee Django session also exists in the
-    # browser. A View-As cookie can then explicitly switch the calendar target.
-    management_user = _get_management_user(request)
-    if management_user:
-        return management_user
+    # The employee realm and the management realm are intentionally independent.
+    # Opening/logging into Management must NEVER replace request.user. The only
+    # way Management can enter an employee calendar is the explicit View-As
+    # action, represented by the signed VIEW_AS_COOKIE.
     if request.user.is_authenticated:
         return request.user
     return None
@@ -169,17 +216,19 @@ def _calendar_actor(request):
 VIEW_AS_COOKIE = 'attendance_view_as'
 
 def _get_view_as_user(request):
-    if not _get_management_user(request):
+    management_user = _get_management_user(request)
+    if not management_user or not _management_permission(management_user, 'workdays_edit'):
         return None
     raw = request.get_signed_cookie(VIEW_AS_COOKIE, default=None, salt='attendance.view-as')
     if raw is None:
         return None
     try:
-        return get_user_model().objects.get(pk=int(raw), is_active=True, is_staff=False)
+        return get_user_model().objects.get(pk=int(raw), is_active=True, is_superuser=False)
     except (ValueError, TypeError, get_user_model().DoesNotExist):
         return None
 
 def _effective_calendar_user(request):
+    # Explicit View-As always wins. Otherwise use the normal employee session.
     return _get_view_as_user(request) or _calendar_actor(request)
 
 @calendar_access_required
@@ -187,7 +236,7 @@ def calendar_view(request):
     m = _resolve_month(request)
     effective_user = _effective_calendar_user(request)
     management_user = _get_management_user(request)
-    view_as_id = effective_user.id if management_user and effective_user != management_user else None
+    view_as_id = effective_user.id if _get_view_as_user(request) else None
     jy, jm = m['jy'], m['jm']
     today_jy, today_jm, today_jd = m['today']
     month_length = m['month_length']
@@ -201,6 +250,9 @@ def calendar_view(request):
 
     stats = _compute_stats(records.values())
     holiday_map = _holiday_map_for_month(jy, jm)
+    deduction_total = SalaryDeduction.objects.filter(
+        user=effective_user, date__range=(start_date, end_date)
+    ).aggregate(total=Sum('amount')).get('total') or Decimal('0')
 
     days = []
     for day_num in range(1, month_length + 1):
@@ -216,6 +268,8 @@ def calendar_view(request):
             'overtime_hours': str(record.overtime_hours) if record and record.overtime_hours else '',
             'note': record.note if record and record.note else '',
             'checked': record is not None,
+            'approval_status': record.approval_status if record else '',
+            'approval_status_display': record.get_approval_status_display() if record else '',
             'holiday_title': holiday_map.get(day_num, {}).get('title', ''),
             'holiday_kind': holiday_map.get(day_num, {}).get('kind', ''),
             'holiday_kind_display': holiday_map.get(day_num, {}).get('kind_display', ''),
@@ -260,11 +314,40 @@ def calendar_view(request):
         'unrecorded_count': unrecorded_count,
         'effective_user': effective_user,
         'is_viewing_employee': bool(view_as_id),
+        'deduction_total': deduction_total,
+        'can_self_add_deduction': bool(request.user.is_authenticated and not view_as_id),
     }
     return render(request, 'attendance/calendar.html', context)
 
 
-@management_required
+def _management_employee_queryset():
+    User = get_user_model()
+    return User.objects.filter(is_active=True, is_staff=False, is_superuser=False).select_related('employee_profile__department').order_by('first_name', 'username')
+
+def _approval_queryset_for_manager(manager):
+    qs = WorkDay.objects.filter(approval_status=WorkDay.APPROVAL_PENDING).select_related(
+        'user', 'user__employee_profile__department'
+    ).order_by('date', 'user__first_name', 'user__username')
+    if manager.is_superuser:
+        return qs
+    profile = getattr(manager, 'employee_profile', None)
+    if profile and profile.department_id:
+        return qs.filter(user__employee_profile__department_id=profile.department_id)
+    return qs
+
+
+def _monthly_deductions(user_ids, start_date, end_date):
+    totals = {user_id: Decimal('0') for user_id in user_ids}
+    if not user_ids:
+        return totals
+    for row in SalaryDeduction.objects.filter(
+        user_id__in=user_ids, date__range=(start_date, end_date)
+    ).values('user_id').annotate(total=Sum('amount')):
+        totals[row['user_id']] = row['total'] or Decimal('0')
+    return totals
+
+
+@management_permission_required('payroll')
 def admin_payroll_view(request):
     """
     صفحه مخصوص ادمین: کارکرد (تعداد روزهای هر وضعیت) همه کارمندان برای یک ماه شمسی مشخص.
@@ -275,7 +358,7 @@ def admin_payroll_view(request):
     m = _resolve_month(request)
     start_date, end_date = m['start_date'], m['end_date']
 
-    employees = User.objects.filter(is_active=True, is_staff=False).order_by('username')
+    employees = _management_employee_queryset()
 
     dept_id = request.GET.get('dept', '').strip()
     if dept_id:
@@ -289,6 +372,7 @@ def admin_payroll_view(request):
     work_days = WorkDay.objects.filter(
         user_id__in=employee_ids,
         date__range=(start_date, end_date),
+        approval_status=WorkDay.APPROVAL_APPROVED,
     ).order_by('user_id', 'date')
     stats_by_user = {employee_id: _compute_stats([]) for employee_id in employee_ids}
     for work_day in work_days:
@@ -297,6 +381,7 @@ def admin_payroll_view(request):
         if work_day.overtime_hours:
             stats['overtime_hours'] += work_day.overtime_hours
 
+    deduction_by_user = _monthly_deductions(employee_ids, start_date, end_date)
     rows = []
     for employee in employee_list:
         stats = stats_by_user[employee.id]
@@ -308,6 +393,7 @@ def admin_payroll_view(request):
             'employee': employee,
             'department': dept_name,
             'stats': stats,
+            'deduction_total': deduction_by_user[employee.id],
         })
 
     context = {
@@ -325,11 +411,10 @@ def admin_payroll_view(request):
     return render(request, 'admin/payroll.html', context)
 
 
-@management_required
+@management_permission_required('dashboard')
 def management_dashboard(request):
-    User = get_user_model()
     m = _resolve_month(request)
-    employees = User.objects.filter(is_active=True, is_staff=False).select_related('employee_profile__department').order_by('first_name', 'username')
+    employees = _management_employee_queryset()
     dept_id = request.GET.get('dept', '').strip()
     if dept_id:
         try:
@@ -343,50 +428,66 @@ def management_dashboard(request):
         date__range=(m['start_date'], m['end_date']),
     ).order_by('user_id', 'date')
     stats_by_user = {employee_id: _compute_stats([]) for employee_id in employee_ids}
+    approval_by_user = {employee_id: {'pending': 0, 'approved': 0, 'rejected': 0} for employee_id in employee_ids}
     for work_day in work_days:
         stats = stats_by_user[work_day.user_id]
         stats[work_day.status] = stats.get(work_day.status, 0) + 1
         if work_day.overtime_hours:
             stats['overtime_hours'] += work_day.overtime_hours
+        approval_by_user[work_day.user_id][work_day.approval_status] = approval_by_user[work_day.user_id].get(work_day.approval_status, 0) + 1
 
+    deduction_by_user = _monthly_deductions(employee_ids, m['start_date'], m['end_date'])
     holiday_count = Holiday.objects.filter(jalali_month=m['jm']).filter(
         Q(jalali_year=None) | Q(jalali_year=m['jy'])
     ).count()
     rows = [
-        {'employee': employee, 'stats': stats_by_user[employee.id], 'holiday_count': holiday_count}
+        {
+            'employee': employee,
+            'stats': stats_by_user[employee.id],
+            'holiday_count': holiday_count,
+            'deduction_total': deduction_by_user[employee.id],
+            'approvals': approval_by_user[employee.id],
+        }
         for employee in employee_list
     ]
+    manager = request.management_user
+    pending_count = _approval_queryset_for_manager(manager).count() if _management_permission(manager, 'workdays_approve') else 0
     return render(request, 'attendance/management/dashboard.html', {
         'rows': rows, 'departments': Department.objects.all(), 'selected_dept': dept_id,
         'month_name': JALALI_MONTH_NAMES[m['jm'] - 1], 'jy': m['jy'], 'jm': m['jm'],
         'prev_y': m['prev_y'], 'prev_m': m['prev_m'], 'next_y': m['next_y'], 'next_m': m['next_m'],
+        'pending_approval_count': pending_count,
+        'can_add_employee': _management_permission(manager, 'employees_create'),
+        'can_add_deduction': _management_permission(manager, 'deductions'),
+        'can_approve': _management_permission(manager, 'workdays_approve'),
     })
 
 
-@management_required
+@management_permission_required('employees')
 def management_employees(request):
     User = get_user_model()
-    employees = User.objects.filter(is_active=True, is_staff=False).select_related('employee_profile__department').order_by('first_name', 'username')
-    return render(request, 'attendance/management/employees.html', {'employees': employees})
+    employees = _management_employee_queryset()
+    return render(request, 'attendance/management/employees.html', {'employees': employees, 'can_add_employee': _management_permission(request.management_user, 'employees_create')})
 
 
-@management_required
+@management_permission_required('workdays_view')
 def management_employee(request, user_id):
     User = get_user_model()
-    employee = get_object_or_404(User.objects.select_related('employee_profile__department'), pk=user_id, is_active=True, is_staff=False)
+    employee = get_object_or_404(User.objects.select_related('employee_profile__department'), pk=user_id, is_active=True, is_superuser=False)
     m = _resolve_month(request)
     days = WorkDay.objects.filter(user=employee, date__range=(m['start_date'], m['end_date']))
+    deduction_total = SalaryDeduction.objects.filter(user=employee, date__range=(m['start_date'], m['end_date'])).aggregate(total=Sum('amount')).get('total') or Decimal('0')
     return render(request, 'attendance/management/employee.html', {
-        'employee': employee, 'stats': _compute_stats(days), 'month_name': JALALI_MONTH_NAMES[m['jm'] - 1],
+        'employee': employee, 'stats': _compute_stats(days), 'deduction_total': deduction_total, 'month_name': JALALI_MONTH_NAMES[m['jm'] - 1],
         'jy': m['jy'], 'jm': m['jm'], 'prev_y': m['prev_y'], 'prev_m': m['prev_m'], 'next_y': m['next_y'], 'next_m': m['next_m'],
     })
 
 
-@management_required
+@management_permission_required('workdays_edit')
 @require_POST
 def management_view_as(request, user_id):
     User = get_user_model()
-    employee = get_object_or_404(User, pk=user_id, is_active=True, is_staff=False)
+    employee = get_object_or_404(User, pk=user_id, is_active=True, is_staff=False, is_superuser=False)
     response = redirect('calendar')
     response.set_signed_cookie(
         VIEW_AS_COOKIE, str(employee.id), salt='attendance.view-as',
@@ -419,7 +520,7 @@ def management_login(request):
     error = None
     if request.method == 'POST':
         user = authenticate(request, username=request.POST.get('username'), password=request.POST.get('password'))
-        if _is_management_admin(user):
+        if _is_management_user(user):
             response = redirect(safe_next)
             response.set_signed_cookie(
                 MANAGEMENT_COOKIE, str(user.pk), salt=MANAGEMENT_COOKIE_SALT,
@@ -481,6 +582,10 @@ def save_day(request):
             'status': final_status,
             'overtime_hours': overtime_hours if overtime_hours is not None else 0,
             'note': note,
+            'approval_status': WorkDay.APPROVAL_PENDING,
+            'approved_by': None,
+            'approved_at': None,
+            'rejection_reason': '',
         },
     )
 
@@ -513,3 +618,161 @@ def delete_day(request):
 
     WorkDay.objects.filter(user=_effective_calendar_user(request), date=the_date).delete()
     return JsonResponse({'ok': True, 'date': iso_date})
+
+
+@management_permission_required('workdays_approve')
+def management_approvals(request):
+    manager = request.management_user
+    selected_date = request.GET.get('date', '').strip()
+    if not selected_date:
+        selected_date = datetime.date.today().isoformat()
+    try:
+        selected = datetime.date.fromisoformat(selected_date)
+    except ValueError:
+        selected = datetime.date.today()
+        selected_date = selected.isoformat()
+    pending = _approval_queryset_for_manager(manager).filter(date=selected)
+    return render(request, 'attendance/management/approvals.html', {
+        'pending': pending,
+        'selected_date': selected_date,
+        'pending_total': _approval_queryset_for_manager(manager).count(),
+    })
+
+
+@management_permission_required('workdays_approve')
+@require_POST
+def management_approve_workday(request, workday_id):
+    manager = request.management_user
+    work_day = get_object_or_404(_approval_queryset_for_manager(manager), pk=workday_id)
+    work_day.approval_status = WorkDay.APPROVAL_APPROVED
+    work_day.approved_by = manager
+    work_day.approved_at = timezone.now()
+    work_day.rejection_reason = ''
+    work_day.save(update_fields=['approval_status', 'approved_by', 'approved_at', 'rejection_reason', 'updated_at'])
+    return redirect(f"{reverse('management_approvals')}?date={work_day.date.isoformat()}")
+
+
+@management_permission_required('workdays_approve')
+@require_POST
+def management_reject_workday(request, workday_id):
+    manager = request.management_user
+    work_day = get_object_or_404(_approval_queryset_for_manager(manager), pk=workday_id)
+    reason = (request.POST.get('reason') or '').strip()
+    if not reason:
+        reason = 'نیاز به بررسی مجدد دارد.'
+    work_day.approval_status = WorkDay.APPROVAL_REJECTED
+    work_day.approved_by = manager
+    work_day.approved_at = timezone.now()
+    work_day.rejection_reason = reason[:2000]
+    work_day.save(update_fields=['approval_status', 'approved_by', 'approved_at', 'rejection_reason', 'updated_at'])
+    return redirect(f"{reverse('management_approvals')}?date={work_day.date.isoformat()}")
+
+
+@management_permission_required('workdays_approve')
+@require_POST
+def management_approve_date(request):
+    manager = request.management_user
+    raw_date = (request.POST.get('date') or '').strip()
+    try:
+        selected = datetime.date.fromisoformat(raw_date)
+    except ValueError:
+        return redirect('management_approvals')
+    now = timezone.now()
+    count = _approval_queryset_for_manager(manager).filter(date=selected).update(
+        approval_status=WorkDay.APPROVAL_APPROVED,
+        approved_by=manager,
+        approved_at=now,
+        rejection_reason='',
+    )
+    messages.success(request, f'{count} مورد برای این روز تایید شد.')
+    return redirect(f"{reverse('management_approvals')}?date={selected.isoformat()}")
+
+
+@management_permission_required('deductions')
+@require_POST
+def management_add_deduction(request, user_id):
+    employee = get_object_or_404(get_user_model(), pk=user_id, is_active=True, is_superuser=False)
+    amount_raw = (request.POST.get('amount') or '').strip().replace(',', '')
+    reason = (request.POST.get('reason') or '').strip()
+    date_raw = (request.POST.get('date') or '').strip()
+    try:
+        amount = Decimal(amount_raw)
+        if amount <= 0:
+            raise InvalidOperation
+    except (InvalidOperation, ValueError):
+        messages.error(request, 'مبلغ کسر حقوق نامعتبر است.')
+        return redirect('management_dashboard')
+    try:
+        deduction_date = datetime.date.fromisoformat(date_raw) if date_raw else datetime.date.today()
+    except ValueError:
+        messages.error(request, 'تاریخ کسر حقوق نامعتبر است.')
+        return redirect('management_dashboard')
+    if not reason:
+        messages.error(request, 'دلیل کسر حقوق را وارد کنید.')
+        return redirect('management_dashboard')
+    SalaryDeduction.objects.create(user=employee, amount=amount, date=deduction_date, reason=reason[:2000], created_by=request.management_user)
+    messages.success(request, 'کسر حقوق با موفقیت ثبت شد.')
+    return redirect('management_dashboard')
+
+
+@login_required
+@require_POST
+def employee_add_self_deduction(request):
+    amount_raw = (request.POST.get('amount') or '').strip().replace(',', '')
+    reason = (request.POST.get('reason') or '').strip()
+    date_raw = (request.POST.get('date') or '').strip()
+    try:
+        amount = Decimal(amount_raw)
+        if amount <= 0:
+            raise InvalidOperation
+    except (InvalidOperation, ValueError):
+        messages.error(request, 'مبلغ کسر حقوق نامعتبر است.')
+        return redirect('calendar')
+    try:
+        deduction_date = datetime.date.fromisoformat(date_raw) if date_raw else datetime.date.today()
+    except ValueError:
+        messages.error(request, 'تاریخ نامعتبر است.')
+        return redirect('calendar')
+    if not reason:
+        messages.error(request, 'دلیل کسر حقوق را وارد کنید.')
+        return redirect('calendar')
+    SalaryDeduction.objects.create(user=request.user, amount=amount, date=deduction_date, reason=reason[:2000], created_by=request.user)
+    messages.success(request, 'کسر حقوق با موفقیت ثبت شد.')
+    return redirect('calendar')
+
+
+@management_permission_required('employees_create')
+@require_POST
+def management_create_employee(request):
+    User = get_user_model()
+    username = (request.POST.get('username') or '').strip()
+    password = request.POST.get('password') or ''
+    first_name = (request.POST.get('first_name') or '').strip()
+    last_name = (request.POST.get('last_name') or '').strip()
+    email = (request.POST.get('email') or '').strip()
+    department_id = (request.POST.get('department') or '').strip()
+    if not username or not password or not first_name:
+        messages.error(request, 'نام کاربری، نام و رمز عبور الزامی است.')
+        return redirect('management_dashboard')
+    if User.objects.filter(username=username).exists():
+        messages.error(request, 'این نام کاربری قبلاً ثبت شده است.')
+        return redirect('management_dashboard')
+    if len(password) < 8:
+        messages.error(request, 'رمز عبور باید حداقل ۸ کاراکتر باشد.')
+        return redirect('management_dashboard')
+    department = None
+    if department_id:
+        try:
+            department = Department.objects.get(pk=int(department_id))
+        except (Department.DoesNotExist, ValueError, TypeError):
+            messages.error(request, 'بخش انتخاب‌شده معتبر نیست.')
+            return redirect('management_dashboard')
+    with transaction.atomic():
+        employee = User.objects.create_user(
+            username=username, password=password, first_name=first_name,
+            last_name=last_name, email=email, is_active=True,
+            is_staff=False, is_superuser=False,
+        )
+        EmployeeProfile.objects.create(user=employee, department=department)
+    messages.success(request, f'کارمند «{employee.get_full_name() or employee.username}» اضافه شد.')
+    return redirect('management_dashboard')

@@ -3,6 +3,19 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
+MANAGEMENT_PERMISSION_CHOICES = [
+    ('dashboard', 'داشبورد کارکرد'),
+    ('employees', 'لیست کارمندان'),
+    ('workdays_view', 'مشاهده جزئیات کارکرد'),
+    ('workdays_edit', 'ویرایش/ثبت کارکرد و ورود به تقویم دیگران'),
+    ('workdays_approve', 'تایید/رد کارکرد کارمندان'),
+    ('deductions', 'ثبت و مدیریت کسر حقوق'),
+    ('employees_create', 'افزودن کارمند جدید'),
+    ('payroll', 'گزارش کارکرد (حسابداری)'),
+]
+MANAGEMENT_PERMISSION_KEYS = tuple(key for key, _label in MANAGEMENT_PERMISSION_CHOICES)
+
+
 class AdminAccount(User):
     """
     پروکسی روی مدل User جنگو، فقط برای اینکه در پنل ادمین یک بخش جدا و ساده
@@ -41,6 +54,24 @@ class WorkDay(models.Model):
         verbose_name='ساعت اضافه‌کاری'
     )
     note = models.TextField(blank=True, default='', verbose_name='یادداشت')
+    APPROVAL_PENDING = 'pending'
+    APPROVAL_APPROVED = 'approved'
+    APPROVAL_REJECTED = 'rejected'
+    APPROVAL_CHOICES = [
+        (APPROVAL_PENDING, 'در انتظار تایید'),
+        (APPROVAL_APPROVED, 'تایید شده'),
+        (APPROVAL_REJECTED, 'رد شده'),
+    ]
+    approval_status = models.CharField(
+        max_length=20, choices=APPROVAL_CHOICES, default=APPROVAL_PENDING,
+        verbose_name='وضعیت تایید'
+    )
+    approved_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='approved_work_days', verbose_name='تاییدکننده'
+    )
+    approved_at = models.DateTimeField(null=True, blank=True, verbose_name='زمان تایید')
+    rejection_reason = models.TextField(blank=True, default='', verbose_name='دلیل رد')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -52,6 +83,30 @@ class WorkDay(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.date} - {self.get_status_display()}"
+
+
+class SalaryDeduction(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='salary_deductions', verbose_name='کارمند')
+    amount = models.DecimalField(
+        max_digits=12, decimal_places=0, validators=[MinValueValidator(1)],
+        verbose_name='مبلغ کسر حقوق'
+    )
+    date = models.DateField(verbose_name='تاریخ')
+    reason = models.TextField(verbose_name='دلیل کسر حقوق')
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_salary_deductions', verbose_name='ثبت‌کننده'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', '-created_at']
+        verbose_name = 'کسر حقوق'
+        verbose_name_plural = 'کسرهای حقوق'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.amount} - {self.date}"
 
 
 class Department(models.Model):
@@ -74,6 +129,22 @@ class EmployeeProfile(models.Model):
         Department, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='employees', verbose_name='بخش'
     )
+    is_accountant = models.BooleanField(
+        default=False, verbose_name='حسابدار / دسترسی مدیریت',
+        help_text='اگر فعال باشد، کاربر همچنان کارمند عادی باقی می‌ماند و می‌تواند برای خودش کارکرد ثبت کند؛ در عین حال می‌تواند با دسترسی‌های انتخاب‌شده وارد پنل مدیریت شود.'
+    )
+    management_permissions = models.JSONField(
+        default=list, blank=True, verbose_name='دسترسی‌های پنل مدیریت',
+        help_text='برای حسابدار. در صورت خالی بودن هنگام فعال‌سازی حسابدار، همه دسترسی‌های فعلی به‌صورت پیش‌فرض فعال می‌شوند.'
+    )
+
+    def has_management_permission(self, permission):
+        if not self.is_accountant:
+            return False
+        return permission in (self.management_permissions or [])
+
+    def grant_full_management_access(self):
+        self.management_permissions = list(MANAGEMENT_PERMISSION_KEYS)
 
     class Meta:
         verbose_name = 'پروفایل کارمند'
