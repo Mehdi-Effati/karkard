@@ -149,7 +149,7 @@ class AccountantRoleTests(TestCase):
         )
 
     def test_accountant_can_enter_management_without_becoming_staff_or_superuser(self):
-        self.assertFalse(self.accountant.is_staff)
+        self.assertTrue(self.accountant.is_staff)
         self.assertFalse(self.accountant.is_superuser)
         response = self.management_login('accountant', 'AccountantPass123!')
         self.assertEqual(response.status_code, 302)
@@ -246,17 +246,17 @@ class ApprovalDeductionAndEmployeeCreationTests(TestCase):
         response = self.client.post(reverse('management_add_deduction', args=[self.employee.pk]), {'amount':'1500000','date':'2026-08-22','reason':'خسارت'})
         self.assertEqual(response.status_code, 302)
         from .models import SalaryDeduction
-        self.assertTrue(SalaryDeduction.objects.filter(user=self.employee, amount=1500000).exists())
+        deduction = SalaryDeduction.objects.get(user=self.employee, amount=1500000)
+        self.assertEqual(str(deduction.date), '2026-08-22')
         response = self.client.get(reverse('management_dashboard') + '?y=1405&m=5')
         self.assertContains(response, '1500000')
 
-    def test_employee_can_add_self_deduction(self):
+    def test_employee_cannot_add_self_deduction(self):
         self.client.force_login(self.employee)
         response = self.client.post(reverse('employee_add_self_deduction'), {'amount':'500000','date':'2026-08-22','reason':'ثبت توسط خودم'})
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response['Location'], reverse('calendar'))
+        self.assertEqual(response.status_code, 403)
         from .models import SalaryDeduction
-        self.assertTrue(SalaryDeduction.objects.filter(user=self.employee, amount=500000, created_by=self.employee).exists())
+        self.assertFalse(SalaryDeduction.objects.filter(user=self.employee, created_by=self.employee).exists())
 
     def test_manager_can_create_employee_from_management(self):
         self.login_management()
@@ -267,3 +267,36 @@ class ApprovalDeductionAndEmployeeCreationTests(TestCase):
         self.assertFalse(new_user.is_staff)
         self.assertFalse(new_user.is_superuser)
         self.assertEqual(new_user.employee_profile.department, self.department)
+
+@override_settings(SESSION_COOKIE_SECURE=False, CSRF_COOKIE_SECURE=False, DEBUG=True)
+class SeparateDjangoAdminSessionTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.employee = User.objects.create_user(username='employee_admin_session', password='EmployeePass123!')
+        self.admin = User.objects.create_user(
+            username='technical_admin', password='AdminPass123!', is_staff=True, is_superuser=True
+        )
+
+    def test_django_admin_uses_separate_session_from_employee(self):
+        self.client.force_login(self.employee)
+        response = self.client.get(reverse('calendar'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('sessionid', self.client.cookies)
+
+        response = self.client.post('/admin/login/', {
+            'username': 'technical_admin',
+            'password': 'AdminPass123!',
+            'next': '/admin/',
+        }, follow=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('karkard_admin_sessionid', self.client.cookies)
+        self.assertIn('sessionid', self.client.cookies)
+
+        response = self.client.get('/admin/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'technical_admin')
+
+        response = self.client.get(reverse('calendar'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'employee_admin_session عزیز')
+        self.assertNotContains(response, 'technical_admin عزیز')

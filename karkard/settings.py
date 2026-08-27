@@ -43,7 +43,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
+    'attendance.admin_session_middleware.SeparateAdminSessionMiddleware',
     'attendance.middleware.ManagementIdentityMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -125,6 +125,7 @@ LOGOUT_REDIRECT_URL = '/login/'
 
 # --- Production security ---
 SESSION_COOKIE_SECURE = not DEBUG
+ADMIN_SESSION_COOKIE_NAME = 'karkard_admin_sessionid'
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'

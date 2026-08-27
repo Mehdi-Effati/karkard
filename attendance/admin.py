@@ -87,7 +87,7 @@ class EmployeeProfileInline(admin.StackedInline):
         ('اطلاعات سازمانی', {'fields': ('department',)}),
         ('دسترسی حسابداری', {
             'fields': ('is_accountant', 'management_permissions'),
-            'description': 'کاربر حسابدار همچنان کارمند عادی است و می‌تواند برای خودش شیفت ثبت کند. فقط دسترسی‌های انتخاب‌شده را در پنل مدیریت دریافت می‌کند.',
+            'description': 'کاربر حسابدار همچنان در فهرست کارمندان و تقویم شخصی خود باقی می‌ماند، اما به‌عنوان Django staff نیز علامت‌گذاری می‌شود و فقط دسترسی‌های انتخاب‌شده را در پنل مدیریت دریافت می‌کند.',
         }),
     )
 
@@ -99,9 +99,18 @@ admin.site.unregister(User)
 @admin.register(User)
 class EmployeeUserAdmin(UserAdmin):
     inlines = [EmployeeProfileInline]
-    list_display = ('username', 'full_name', 'is_accountant', 'is_staff', 'is_superuser', 'is_active')
+    list_display = ('username', 'full_name', 'is_accountant', 'is_staff', 'is_superuser', 'is_active', 'work_calendar_link')
     list_filter = ('is_active', 'is_staff', 'is_superuser', 'employee_profile__is_accountant')
     search_fields = ('username', 'first_name', 'last_name', 'email')
+
+    @admin.display(description='تقویم کارکرد')
+    def work_calendar_link(self, obj):
+        if obj.is_superuser:
+            return '—'
+        from django.utils.html import format_html
+        from django.urls import reverse
+        url = reverse('admin_employee_calendar', args=[obj.pk])
+        return format_html('<a href="{}">مشاهده تقویم</a>', url)
 
     @admin.display(boolean=True, description='حسابدار')
     def is_accountant(self, obj):
@@ -111,6 +120,17 @@ class EmployeeUserAdmin(UserAdmin):
     @admin.display(description='نام')
     def full_name(self, obj):
         return obj.get_full_name() or obj.username
+
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if isinstance(instance, EmployeeProfile):
+                instance.user.is_staff = bool(instance.is_accountant)
+                if instance.is_accountant and not instance.management_permissions:
+                    instance.management_permissions = list(MANAGEMENT_PERMISSION_KEYS)
+                instance.user.save(update_fields=['is_staff'])
+            instance.save()
+        formset.save_m2m()
 
     def get_inline_instances(self, request, obj=None):
         # موقع ساخت کاربر جدید (obj=None) اینلاین نشان داده نشود، چون هنوز رکورد User ای برای اتصال نیست

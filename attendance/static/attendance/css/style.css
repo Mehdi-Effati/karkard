@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --ink: #1c2430;
+  --ink: #111827;
   --ink-soft: #5c6675;
   --ink-invert: #f3f6f8;
 
@@ -137,7 +137,7 @@ a { color: inherit; }
 .month-nav .month-title .yr {
   font-size: 15px;
   font-weight: 500;
-  color: rgba(243,246,248,0.7);
+  color: var(--ink-soft);
 }
 
 .nav-btn {
@@ -185,13 +185,13 @@ a { color: inherit; }
 }
 
 .glass-panel {
-  background: var(--glass-dark-bg);
+  background: rgba(255,255,255,0.96);
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
   border: 1px solid var(--glass-dark-border);
   border-radius: var(--radius-lg);
   padding: 18px 20px;
-  color: var(--ink-invert);
+  color: var(--ink);
   box-shadow: 0 20px 50px -30px rgba(0,0,0,0.5);
 }
 
@@ -199,7 +199,7 @@ a { color: inherit; }
   margin: 0 0 12px;
   font-size: 13px;
   font-weight: 600;
-  color: rgba(243,246,248,0.75);
+  color: var(--ink-soft);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -214,10 +214,10 @@ a { color: inherit; }
   text-align: center;
   padding: 8px 4px;
   border-radius: var(--radius-sm);
-  background: rgba(255,255,255,0.06);
+  background: #f8fafc;
 }
 .stat-item .num { font-size: 19px; font-weight: 800; }
-.stat-item .lbl { font-size: 11px; color: rgba(243,246,248,0.7); margin-top: 2px; }
+.stat-item .lbl { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
 .stat-item.c-work .num { color: var(--c-work); }
 .stat-item.c-night .num { color: var(--c-night); }
 .stat-item.c-holiday .num { color: var(--c-holiday); }
@@ -234,9 +234,9 @@ a { color: inherit; }
   font-size: 12.5px;
   padding: 7px 10px;
   border-radius: var(--radius-sm);
-  background: rgba(255,255,255,0.06);
+  background: #f8fafc;
 }
-.payroll-row .label { color: rgba(243,246,248,0.75); }
+.payroll-row .label { color: var(--ink-soft); }
 .payroll-row .value { font-weight: 700; direction: ltr; }
 .payroll-total {
   margin-top: 10px;
@@ -251,7 +251,7 @@ a { color: inherit; }
 .payroll-total .value { direction: ltr; font-size: 16px; }
 .payroll-hint {
   font-size: 11.5px;
-  color: rgba(243,246,248,0.6);
+  color: var(--ink-soft);
   margin-top: 10px;
   line-height: 1.7;
 }
@@ -263,7 +263,7 @@ a { color: inherit; }
   gap: 16px;
   margin-bottom: 18px;
   font-size: 12.5px;
-  color: rgba(243,246,248,0.85);
+  color: var(--ink-soft);
 }
 .legend .item { display: flex; align-items: center; gap: 7px; }
 .legend .swatch { width: 13px; height: 13px; border-radius: 5px; border: 2px solid; }
@@ -312,7 +312,7 @@ a { color: inherit; }
   text-align: center;
   font-size: 12px;
   font-weight: 700;
-  color: var(--ink-invert);
+  color: #ffffff;
   background: var(--glass-dark-bg);
   border: 1px solid var(--glass-dark-border);
   border-radius: 10px;
@@ -876,3 +876,26 @@ body {
 .deduction-panel{max-width:none;margin-bottom:18px}.deduction-form{display:grid;grid-template-columns:160px 160px 1fr auto;gap:8px}.deduction-form input{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:10px;padding:10px;font:inherit}.deduction-form input::placeholder{color:rgba(255,255,255,.65)}
 @media(max-width:700px){.deduction-form{grid-template-columns:1fr}.deduction-form button{width:100%}}
 .calendar-messages{max-width:1040px;margin:14px auto 0;padding:0 20px}.calendar-message{background:rgba(16,185,129,.18);border:1px solid rgba(52,211,153,.35);color:#d1fae5;border-radius:12px;padding:10px 14px;font-size:12px}
+
+/* Explicit readable text on light calendar surfaces */
+.glass-panel,.calendar-card,.day-cell,.modal,.deduction-panel{color:#111827}.day-cell .day-number,.day-cell .gdate,.modal,.modal h3,.modal .field-label,.modal input,.modal textarea{color:#111827}.day-cell .gdate{opacity:.72}.calendar-card .weekday-row div{color:#e5edf4}.deduction-form input,.deduction-form textarea,.hours-input,.note-textarea{color:#111827;background:#fff}
+
+
+/* Employee panel readability */
+.glass-panel input,.glass-panel textarea,.glass-panel select{color:var(--ink);background:#fff;border:1px solid #d7dde5}
+.glass-panel .btn{color:#fff}
+
+/* Centered modal system */
+body.modal-open{overflow:hidden}
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.58);backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;padding:22px;z-index:1000}
+.modal-overlay.open{display:flex}
+.center-modal{position:relative;width:min(620px,100%);background:#fff;color:var(--ink);border:1px solid #e5e7eb;border-radius:22px;padding:26px;box-shadow:0 30px 100px rgba(0,0,0,.28)}
+.small-modal{width:min(460px,100%)}
+.center-modal h2{margin:0 0 6px;font-size:20px;color:#111827}.center-modal>p{margin:0 0 18px;color:#64748b;font-size:12px}.modal-x{position:absolute;left:14px;top:12px;border:0;background:#f1f5f9;color:#334155;width:34px;height:34px;border-radius:10px;font-size:23px;cursor:pointer}.modal-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.modal-form input,.modal-form select,.modal-form textarea{border:1px solid #d7dde5;background:#fff;color:#111827;border-radius:11px;padding:11px 12px;font:500 12px Vazirmatn}.modal-form textarea{min-height:95px;resize:vertical;grid-column:1/-1}.modal-form .form-actions{grid-column:1/-1;justify-content:flex-start;margin-top:4px}.modal-form .primary,.modal-form .danger-btn{cursor:pointer}@media(max-width:600px){.modal-form{grid-template-columns:1fr}.modal-form textarea{grid-column:auto}}
+
+
+/* Employee deduction modal + shared Jalali date picker */
+.deduction-action-row{display:flex;justify-content:flex-start;align-items:center;margin:16px 0 20px}.deduction-action-row .btn{min-width:190px}
+body.modal-open{overflow:hidden}.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:20px;z-index:2000}.modal-overlay.open{display:flex}.center-modal{position:relative;width:min(620px,100%);background:#fff;color:#111827;border:1px solid #e5e7eb;border-radius:22px;padding:26px;box-shadow:0 30px 100px rgba(0,0,0,.30)}.small-modal{width:min(480px,100%)}.center-modal h2{margin:0 0 6px;color:#111827;font-size:20px}.center-modal>p{margin:0 0 18px;color:#64748b;font-size:12px;line-height:1.8}.modal-x{position:absolute;left:14px;top:12px;border:0;background:#f1f5f9;color:#334155;width:34px;height:34px;border-radius:10px;font-size:23px;cursor:pointer}.modal-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.modal-form label{display:grid;gap:6px}.modal-form label span{font-size:11px;font-weight:700;color:#334155}.modal-form input,.modal-form textarea{width:100%;border:1px solid #d7dde5;background:#fff;color:#111827;border-radius:11px;padding:11px 12px;font:500 12px Vazirmatn}.modal-form input::placeholder,.modal-form textarea::placeholder{color:#94a3b8}.modal-form textarea{min-height:105px;resize:vertical}.modal-form .full{grid-column:1/-1}.modal-form .form-actions{display:flex;gap:8px;justify-content:flex-start;margin-top:3px}.btn-secondary{border:1px solid #d7dde5;background:#f8fafc;color:#334155;border-radius:10px;padding:10px 15px;font:600 12px Vazirmatn;cursor:pointer}
+.jalali-modal-open{overflow:hidden}.jalali-modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:100001;display:flex;align-items:center;justify-content:center;padding:20px}.jalali-modal{width:min(360px,100%);background:#fff;color:#111827;border:1px solid #e5e7eb;border-radius:20px;padding:18px;box-shadow:0 30px 90px rgba(0,0,0,.28)}.jp-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.jp-top div{display:grid;gap:2px}.jp-caption{font-size:10px;color:#64748b}.jp-top b{font-size:15px;color:#111827}.jp-close{border:0;background:#f1f5f9;color:#334155;border-radius:9px;width:32px;height:32px;font-size:22px;cursor:pointer}.jp-head{display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border-radius:12px;padding:7px;margin-bottom:10px}.jp-head button{border:0;background:#fff;color:#0f8b5f;border-radius:8px;width:32px;height:32px;box-shadow:0 1px 4px rgba(15,23,42,.08);cursor:pointer;font-size:20px}.jp-head b{font-size:12px;color:#111827}.jp-wd,.jp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;text-align:center}.jp-wd span{font-size:9px;color:#64748b;padding:5px}.jp-days button{border:1px solid #edf0f4;background:#fff;border-radius:9px;padding:8px 2px;color:#111827;cursor:pointer;font:600 11px Vazirmatn;transition:.12s}.jp-days button:hover{background:#ecfdf5;border-color:#a7f3d0;color:#047857;transform:translateY(-1px)}.jp-footer{display:flex;justify-content:space-between;margin-top:13px}.jp-footer button{border:0;border-radius:9px;padding:8px 12px;font:600 11px Vazirmatn;cursor:pointer}.jp-today{background:#ecfdf5;color:#047857}.jp-cancel{background:#f1f5f9;color:#475569}
+@media(max-width:600px){.modal-form{grid-template-columns:1fr}.modal-form .full{grid-column:auto}.modal-form .form-actions{grid-column:auto}.deduction-action-row .btn{width:100%}}

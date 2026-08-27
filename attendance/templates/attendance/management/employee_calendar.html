@@ -1,0 +1,16 @@
+{% extends 'attendance/management_base.html' %}
+{% load static %}
+{% block title %}تقویم {{ employee.get_full_name|default:employee.username }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">تقویم کارمند</span><h1>{{ employee.get_full_name|default:employee.username }}</h1><p>@{{ employee.username }} · {{ employee.employee_profile.department.name|default:'بدون بخش' }}</p></div>{% if not admin_mode %}<form method="post" action="{% url 'management_view_as' employee.id %}">{% csrf_token %}<button class="primary" type="submit">ورود به تقویم کارمند</button></form>{% endif %}</div>
+<div class="calendar-status-legend"><span><i class="line-status approved"></i> تایید شده</span><span><i class="line-status pending"></i> تایید نشده</span><span><i class="line-status rejected"></i> رد شده</span></div>
+<div class="toolbar"><div class="month"><a href="?y={{prev_y}}&m={{prev_m}}">‹</a><strong>{{month_name}} {{jy}}</strong><a href="?y={{next_y}}&m={{next_m}}">›</a></div></div>
+<div class="approval-calendar">
+<div class="weekday-row">{% for wd in weekday_names %}<div>{{wd}}</div>{% endfor %}</div>
+{% for week in weeks %}<div class="week-row">{% for day in week %}{% if day %}<button type="button" class="approval-day {% if day.approval_status == 'approved' %}approval-approved{% elif day.approval_status == 'pending' %}approval-pending{% elif day.approval_status == 'rejected' %}approval-rejected{% endif %}" data-date="{{day.iso_date}}" data-jalali="{{day.jalali_date}}" data-status="{{day.status_display}}" data-hours="{{day.overtime_hours}}" data-note="{{day.note|escapejs}}" data-approval="{{day.approval_status}}" data-approval-display="{{day.approval_status_display}}" data-reason="{{day.rejection_reason|escapejs}}" data-record-id="{{day.record_id}}" data-gregorian="{{day.gregorian}}"><span class="approval-day-number">{{day.jalali_day}}</span>{% if day.status_display %}<small>{{day.status_display}}</small>{% endif %}{% if day.overtime_hours %}<em>{{day.overtime_hours}} ساعت</em>{% endif %}</button>{% else %}<div class="approval-day empty"></div>{% endif %}{% endfor %}</div>{% endfor %}
+</div>
+<div class="approval-day-modal" id="approval-day-modal"><div class="approval-modal-box"><button class="modal-close" type="button" id="approval-modal-close">×</button><h2 id="approval-modal-title"></h2><div class="approval-modal-meta" id="approval-modal-meta"></div><div class="approval-modal-details"><div><span>وضعیت شیفت</span><b id="approval-modal-status">—</b></div><div><span>اضافه‌کاری</span><b id="approval-modal-hours">—</b></div><div class="full"><span>یادداشت کارمند</span><p id="approval-modal-note">—</p></div><div class="full" id="approval-modal-reason-wrap"><span>دلیل رد</span><p id="approval-modal-reason">—</p></div></div><div class="approval-modal-actions" id="approval-modal-actions"></div></div></div>
+{% endblock %}
+{% block extra_js %}
+<script>window.CSRF_TOKEN='{{ csrf_token }}'; window.ADMIN_MODE=false; window.CAN_APPROVE={{ can_approve|yesno:"true,false" }}; window.APPROVE_URL_TEMPLATE='{% url 'management_approve_workday' 0 %}'; window.REJECT_URL_TEMPLATE='{% url 'management_reject_workday' 0 %}';</script><script src="{% static 'attendance/js/approval-calendar.js' %}?v=14"></script>
+{% endblock %}

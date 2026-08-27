@@ -55,12 +55,7 @@
       </div>
     </div>
 
-    {% if can_self_add_deduction %}
-    <div class="glass-panel deduction-panel">
-      <h4>ثبت کسر حقوق برای خودم</h4>
-      <form method="post" action="{% url 'employee_add_self_deduction' %}" class="deduction-form">{% csrf_token %}<input name="amount" inputmode="numeric" placeholder="مبلغ" required><input type="date" name="date"><input name="reason" placeholder="دلیل کسر حقوق" required><button class="btn btn-primary" type="submit">ثبت کسر حقوق</button></form>
-    </div>
-    {% endif %}
+    
 
     <div class="legend">
       <span class="item"><span class="swatch" style="border-color:var(--c-work)"></span> روز کاری</span>
@@ -151,6 +146,17 @@
   <script>
     const SAVE_URL = "{% url 'save_day' %}";
     const DELETE_URL = "{% url 'delete_day' %}";
+  </script>
+  <script src="{% static 'attendance/js/jalali-date.js' %}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const open = m => { m.classList.add('open'); m.setAttribute('aria-hidden','false'); document.body.classList.add('modal-open'); };
+      const close = m => { if (!m) return; m.classList.remove('open'); m.setAttribute('aria-hidden','true'); if (!document.querySelector('.modal-overlay.open')) document.body.classList.remove('modal-open'); };
+      document.querySelectorAll('[data-open-modal]').forEach(b => b.addEventListener('click', () => open(document.getElementById(b.dataset.openModal))));
+      document.querySelectorAll('[data-close-modal]').forEach(b => b.addEventListener('click', () => close(document.getElementById(b.dataset.closeModal))));
+      document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) close(m); }));
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(close); });
+    });
   </script>
   <script src="{% static 'attendance/js/calendar.js' %}"></script>
   <script>

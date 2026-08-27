@@ -1,8 +1,19 @@
 {% extends 'attendance/management_base.html' %}
 {% block title %}تایید کارکرد{% endblock %}
 {% block content %}
-{% if messages %}<div class="flash-stack">{% for message in messages %}<div class="flash">{{ message }}</div>{% endfor %}</div>{% endif %}<div class="page-head"><div><span class="eyebrow">کنترل کارکرد</span><h1>تایید روزها</h1><p>هر ثبت جدید تا زمانی که سرپرست/مدیر آن را تایید نکند، قطعی محسوب نمی‌شود.</p></div></div>
-<div class="approval-toolbar"><form method="get"><label>تاریخ بررسی</label><input type="date" name="date" value="{{selected_date}}"><button class="primary" type="submit">نمایش</button></form><form method="post" action="{% url 'management_approve_date' %}">{% csrf_token %}<input type="hidden" name="date" value="{{selected_date}}"><button class="secondary" type="submit" {% if not pending %}disabled{% endif %}>تایید همه ثبت‌های این روز</button></form></div>
-<div class="approval-count">{{pending_total}} مورد در صف تایید</div>
-<div class="approval-list">{% for wd in pending %}<article class="approval-card"><div><strong>{{wd.user.get_full_name|default:wd.user.username}}</strong><small>{{wd.user.employee_profile.department.name|default:'بدون بخش'}} · {{wd.date}}</small></div><div class="approval-details"><span>{{wd.get_status_display}}</span><span>{{wd.overtime_hours|default:'0'}} ساعت اضافه‌کاری</span>{% if wd.note %}<span>{{wd.note}}</span>{% endif %}</div><div class="approval-actions"><form method="post" action="{% url 'management_approve_workday' wd.id %}">{% csrf_token %}<button class="approve-btn" type="submit">تایید</button></form><form method="post" action="{% url 'management_reject_workday' wd.id %}">{% csrf_token %}<input name="reason" placeholder="دلیل رد (اختیاری)"><button class="reject-btn" type="submit">رد</button></form></div></article>{% empty %}<div class="empty-card">برای این تاریخ موردی در انتظار تایید نیست. ✅</div>{% endfor %}</div>
+<div class="page-head">
+  <div><span class="eyebrow">کنترل کارکرد</span><h1>تایید کارکرد کارکنان</h1><p>وضعیت تایید هر کارمند را یکجا ببینید و برای بررسی وارد تقویم او شوید.</p></div>
+  <div class="approval-total"><b>{{ pending_total }}</b><span>روز در انتظار تایید</span></div>
+</div>
+<div class="approval-toolbar approval-search"><form method="get"><input name="q" value="{{ search }}" placeholder="جستجوی نام، نام کاربری یا بخش..."><button class="primary" type="submit">جستجو</button>{% if search %}<a class="secondary" href="{% url 'management_approvals' %}">حذف جستجو</a>{% endif %}</form></div>
+<div class="approval-legend"><span><i class="approval-dot-card ok"></i> بدون روز تاییدنشده</span><span><i class="approval-dot-card pending"></i> دارای روز تاییدنشده</span></div>
+<div class="approval-employee-grid">
+{% for card in employee_cards %}
+  <a class="approval-employee-card" href="{% url 'management_employee_calendar' card.employee.id %}">
+    <div class="avatar">{{ card.employee.first_name|default:card.employee.username|slice:':1' }}</div>
+    <div class="approval-employee-info"><strong>{{ card.employee.get_full_name|default:card.employee.username }}</strong><small>@{{ card.employee.username }} · {{ card.employee.employee_profile.department.name|default:'بدون بخش' }}</small></div>
+    <div class="approval-status {% if card.pending %}has-pending{% else %}all-clear{% endif %}"><i></i>{% if card.pending %}<b>{{ card.pending }}</b><span>روز تایید نشده</span>{% else %}<span>همه تایید شده</span>{% endif %}</div>
+  </a>
+{% empty %}<div class="empty-card">کارمندی برای نمایش پیدا نشد.</div>{% endfor %}
+</div>
 {% endblock %}

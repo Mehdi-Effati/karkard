@@ -138,6 +138,15 @@ class EmployeeProfile(models.Model):
         help_text='برای حسابدار. در صورت خالی بودن هنگام فعال‌سازی حسابدار، همه دسترسی‌های فعلی به‌صورت پیش‌فرض فعال می‌شوند.'
     )
 
+    def save(self, *args, **kwargs):
+        # حسابدار از نظر Django یک Staff User است، اما Superuser نیست.
+        # این هم‌زمانی باعث می‌شود حسابدار هم در پنل مدیریت احراز هویت شود
+        # و هم به‌عنوان کارمند در لیست کارکرد باقی بماند.
+        if self.is_accountant and not self.user.is_staff:
+            self.user.is_staff = True
+            self.user.save(update_fields=['is_staff'])
+        super().save(*args, **kwargs)
+
     def has_management_permission(self, permission):
         if not self.is_accountant:
             return False

@@ -1,5 +1,34 @@
-{% extends 'attendance/management_base.html' %}{% block title %}پروفایل کارمند{% endblock %}{% block content %}
-<div class="page-head"><div><span class="eyebrow">پروفایل کارمند</span><h1>{{employee.get_full_name|default:employee.username}}</h1><p>@{{employee.username}} · {{employee.employee_profile.department.name|default:'بدون بخش'}}</p></div><form method="post" action="{% url 'management_view_as' employee.id %}" class="inline-form">{% csrf_token %}<button class="primary" type="submit">ورود به تقویم کارمند</button></form></div>
+{% extends 'attendance/management_base.html' %}
+{% load static %}
+{% block title %}پروفایل کارمند{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">پروفایل کارمند</span><h1>{{employee.get_full_name|default:employee.username}}</h1><p>@{{employee.username}} · {{employee.employee_profile.department.name|default:'بدون بخش'}}</p></div>
+  <form method="post" action="{% url 'management_view_as' employee.id %}" class="inline-form">{% csrf_token %}<button class="primary" type="submit">ورود به تقویم کارمند</button></form>
+</div>
 <div class="cards detail"><div><span>روزکاری</span><b>{{stats.work}}</b></div><div><span>شب‌کاری</span><b>{{stats.night}}</b></div><div><span>تعطیل‌کاری</span><b>{{stats.holiday_work}}</b></div><div><span>جمعه‌کاری</span><b>{{stats.friday_work}}</b></div><div><span>مرخصی</span><b>{{stats.leave}}</b></div><div><span>اضافه‌کاری</span><b>{{stats.overtime_hours}} ساعت</b></div><div><span>کسر حقوق</span><b>{{deduction_total}}</b></div></div>
-<div class="toolbar"><div class="month"><a href="?y={{prev_y}}&m={{prev_m}}">‹</a><strong>{{month_name}} {{jy}}</strong><a href="?y={{next_y}}&m={{next_m}}">›</a></div></div><p class="hint">برای مشاهده جزئیات روزبه‌روز، وارد تقویم کارمند شوید.</p>
+<div class="toolbar"><div class="month"><a href="?y={{prev_y}}&m={{prev_m}}">‹</a><strong>{{month_name}} {{jy}}</strong><a href="?y={{next_y}}&m={{next_m}}">›</a></div></div>
+
+<div class="deduction-panel">
+  <div class="section-head"><div><h2>کسرهای حقوق این ماه</h2><p>مبلغ‌ها به تومان ذخیره می‌شوند و برای اصلاح، واحد ورودی «میلیون تومان» است.</p></div>{% if can_manage_deductions %}<button type="button" class="primary" id="open-add-deduction">افزودن کسر حقوق</button>{% endif %}</div>
+  <div class="table-card"><table class="deduction-table"><thead><tr><th>تاریخ</th><th>مبلغ</th><th>دلیل</th><th>ثبت‌کننده</th>{% if can_manage_deductions %}<th>عملیات</th>{% endif %}</tr></thead><tbody>
+  {% for item in deductions %}<tr><td>{{item.jalali_date}}</td><td><b>{{item.obj.amount}}</b> تومان</td><td class="reason-cell">{{item.obj.reason}}</td><td>{{item.obj.created_by.get_full_name|default:item.obj.created_by.username|default:'—'}}</td>{% if can_manage_deductions %}<td><div class="row-actions"><button type="button" class="icon-btn edit-deduction" data-id="{{item.obj.id}}" data-amount="{{item.obj.amount}}" data-date="{{item.jalali_date}}" data-reason="{{item.obj.reason|escapejs}}">اصلاح</button><form method="post" action="{% url 'management_delete_deduction' item.obj.id %}" onsubmit="return confirm('این کسر حقوق حذف شود؟');" style="display:inline">{% csrf_token %}<button class="icon-btn danger-outline" type="submit">حذف</button></form></div></td>{% endif %}</tr>{% empty %}<tr><td colspan="5" class="empty">برای این ماه کسر حقوقی ثبت نشده است.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+
+{% if can_manage_deductions %}
+<div class="modal-overlay" id="employee-deduction-modal" aria-hidden="true"><div class="center-modal small-modal" role="dialog" aria-modal="true"><button class="modal-x" type="button" data-close-modal="employee-deduction-modal">×</button><h2 id="deduction-modal-title">افزودن کسر حقوق</h2><p>مبلغ را به میلیون تومان وارد کنید؛ مثلاً ۰.۲ یعنی ۲۰۰ هزار تومان و ۱ یعنی یک میلیون تومان.</p><form method="post" id="employee-deduction-form" class="modal-form" action="{% url 'management_add_deduction' employee.id %}">{% csrf_token %}<input name="amount" id="deduction-amount" inputmode="decimal" placeholder="مبلغ به میلیون تومان؛ مثلاً ۱ یا ۰.۲ *" required><input class="jalali-date-input" name="date" id="deduction-date" placeholder="تاریخ شمسی؛ مثلاً ۱۴۰۵/۰۶/۰۱ *" inputmode="numeric" autocomplete="off" required><textarea name="reason" id="deduction-reason" placeholder="دلیل کسر حقوق *" required></textarea><div class="form-actions"><button class="primary" type="submit" id="deduction-submit">ثبت کسر حقوق</button></div></form></div></div>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+ const modal=document.getElementById('employee-deduction-modal'); if(!modal)return;
+ const form=document.getElementById('employee-deduction-form'), title=document.getElementById('deduction-modal-title'), amount=document.getElementById('deduction-amount'), date=document.getElementById('deduction-date'), reason=document.getElementById('deduction-reason'), submit=document.getElementById('deduction-submit');
+ function open(){modal.classList.add('open');modal.setAttribute('aria-hidden','false');document.body.classList.add('modal-open')}
+ function close(){modal.classList.remove('open');modal.setAttribute('aria-hidden','true');document.body.classList.remove('modal-open')}
+ document.getElementById('open-add-deduction')?.addEventListener('click',()=>{form.action="{% url 'management_add_deduction' employee.id %}";title.textContent='افزودن کسر حقوق';submit.textContent='ثبت کسر حقوق';amount.value='';date.value='';reason.value='';open()});
+ document.querySelectorAll('.edit-deduction').forEach(btn=>btn.addEventListener('click',()=>{form.action="{% url 'management_edit_deduction' 0 %}".replace('/0/','/'+btn.dataset.id+'/');title.textContent='اصلاح کسر حقوق';submit.textContent='ذخیره تغییرات';amount.value=(Number(btn.dataset.amount)/1000000).toString();date.value=btn.dataset.date;reason.value=btn.dataset.reason||'';open()}));
+ document.querySelectorAll('[data-close-modal]').forEach(b=>b.addEventListener('click',close)); modal.addEventListener('click',e=>{if(e.target===modal)close()}); document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('open'))close()});
+});
+</script>
 {% endblock %}
