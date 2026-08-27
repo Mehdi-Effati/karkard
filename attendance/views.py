@@ -203,7 +203,7 @@ def _is_management_user(user):
     if user.is_superuser:
         return True
     profile = getattr(user, 'employee_profile', None)
-    return bool(user.is_staff and profile and profile.is_accountant)
+    return bool(profile and profile.is_accountant)
 
 
 def _is_management_admin(user):
@@ -429,15 +429,20 @@ def _management_employee_queryset():
     ).select_related('employee_profile__department').order_by('first_name', 'username')
 
 def _approval_queryset_for_manager(manager):
-    qs = WorkDay.objects.filter(approval_status=WorkDay.APPROVAL_PENDING).select_related(
+    """Return pending workdays visible to the current management identity.
+
+    Management permissions already determine whether the caller may reach the
+    approval endpoints. Once an accountant has the ``workdays_approve``
+    permission, approval is intentionally global: accountants must be able to
+    review every employee, including employees outside their own department.
+    The accountant is still a normal employee and remains in the employee
+    lists; department is not an approval-visibility boundary.
+    """
+    return WorkDay.objects.filter(
+        approval_status=WorkDay.APPROVAL_PENDING
+    ).select_related(
         'user', 'user__employee_profile__department'
     ).order_by('date', 'user__first_name', 'user__username')
-    if manager.is_superuser:
-        return qs
-    profile = getattr(manager, 'employee_profile', None)
-    if profile and profile.department_id:
-        return qs.filter(user__employee_profile__department_id=profile.department_id)
-    return qs
 
 
 def _monthly_deductions(user_ids, start_date, end_date):
@@ -809,12 +814,9 @@ def management_approvals(request):
             Q(first_name__icontains=search) | Q(last_name__icontains=search) |
             Q(username__icontains=search) | Q(employee_profile__department__name__icontains=search)
         )
-    if not manager.is_superuser:
-        profile = getattr(manager, 'employee_profile', None)
-        if profile and profile.department_id:
-            employees = employees.filter(employee_profile__department_id=profile.department_id)
-        else:
-            employees = employees.none()
+    # حسابدارِ دارای دسترسی تایید کارکرد باید کل کارکنان را ببیند، نه فقط افراد بخش خودش.
+    # Superuser و Accountant هر دو از همین فهرست کامل استفاده می‌کنند؛ محدودیت دسترسی
+    # حسابدار فقط از طریق management_permissions اعمال می‌شود.
     pending_counts = {row['user_id']: row['count'] for row in WorkDay.objects.filter(
         approval_status=WorkDay.APPROVAL_PENDING, user__in=employees
     ).values('user_id').annotate(count=Count('id'))}

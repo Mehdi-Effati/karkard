@@ -206,6 +206,42 @@ class AccountantRoleTests(TestCase):
 
 
 @override_settings(SESSION_COOKIE_SECURE=False, CSRF_COOKIE_SECURE=False, DEBUG=True)
+class AccountantGlobalApprovalVisibilityTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        from .models import EmployeeProfile, Department, MANAGEMENT_PERMISSION_KEYS
+        self.accountant = User.objects.create_user(username='global_accountant', password='AccountantPass123!', first_name='حسابدار')
+        self.worker = User.objects.create_user(username='other_department_worker', password='WorkerPass123!', first_name='کارمند بخش دیگر')
+        accounting = Department.objects.create(name='حسابداری')
+        production = Department.objects.create(name='تولید')
+        EmployeeProfile.objects.create(
+            user=self.accountant, department=accounting, is_accountant=True,
+            management_permissions=list(MANAGEMENT_PERMISSION_KEYS),
+        )
+        EmployeeProfile.objects.create(user=self.worker, department=production)
+
+    def test_accountant_can_enter_management_without_requiring_staff_flag(self):
+        self.accountant.is_staff = False
+        self.accountant.save(update_fields=['is_staff'])
+        response = self.client.post(reverse('management_login'), {
+            'username': 'global_accountant', 'password': 'AccountantPass123!',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('management_dashboard'))
+
+    def test_accountant_sees_employees_from_other_departments_in_approvals(self):
+        self.accountant.is_staff = False
+        self.accountant.save(update_fields=['is_staff'])
+        self.client.post(reverse('management_login'), {
+            'username': 'global_accountant', 'password': 'AccountantPass123!',
+        })
+        response = self.client.get(reverse('management_approvals'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'حسابدار')
+        self.assertContains(response, 'کارمند بخش دیگر')
+
+
+@override_settings(SESSION_COOKIE_SECURE=False, CSRF_COOKIE_SECURE=False, DEBUG=True)
 class ApprovalDeductionAndEmployeeCreationTests(TestCase):
     def setUp(self):
         User = get_user_model()
