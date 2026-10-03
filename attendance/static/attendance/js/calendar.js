@@ -33,6 +33,7 @@
   }
 
   function openModalForCell(cell) {
+    if (cell.classList.contains('future-day')) return;
     currentDate = cell.dataset.date;
     resetForm();
 
@@ -45,6 +46,13 @@
     } else {
       modalHolidayEl.style.display = 'none';
     }
+
+    const isFriday = cell.dataset.friday === '1';
+    statusOptions.forEach((el) => {
+      const value = el.dataset.value;
+      const allowed = isFriday ? (value === 'friday_work' || value === 'off') : value !== 'friday_work';
+      el.style.display = allowed ? '' : 'none';
+    });
 
     const existingStatus = cell.dataset.status;
     if (existingStatus) {

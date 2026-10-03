@@ -1,8 +1,32 @@
 {% load static %}
-<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{% block title %}پنل مدیریت کارکرد{% endblock %}</title><link rel="stylesheet" href="{% static 'attendance/css/management.css' %}?v=14">
+<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{% block title %}پنل مدیریت کارکرد{% endblock %}</title><link rel="stylesheet" href="{% static 'attendance/css/management.css' %}?v=25">
 <script src="{% static 'attendance/js/jalali-date.js' %}?v=14"></script></head>
 <body>
 <div class="admin-shell">
-<aside class="sidebar"><div class="brand"><span class="brand-mark">ک</span><div><b>کارکرد</b><small>پنل حسابداری</small></div></div><nav>{% if 'dashboard' in request.management_permissions %}<a href="{% url 'management_dashboard' %}">داشبورد کارکرد</a>{% endif %}{% if 'employees' in request.management_permissions %}<a href="{% url 'management_employees' %}">کارمندان</a>{% endif %}{% if 'workdays_approve' in request.management_permissions %}<a href="{% url 'management_approvals' %}">تایید کارکرد</a>{% endif %}{% if request.management_user.is_superuser %}<a href="{% url 'admin:index' %}">پنل فنی Django</a>{% endif %}</nav><div class="side-user">{% if request.management_user %}<span>{{ request.management_user.get_full_name|default:request.management_user.username }}</span><form method="post" action="{% url 'management_logout' %}">{% csrf_token %}<button type="submit">خروج</button></form>{% endif %}</div></aside>
-<main class="main"><header class="mobile-head"><b>پنل حسابداری</b>{% if 'employees' in request.management_permissions %}<a href="{% url 'management_employees' %}">کارمندان</a>{% endif %}{% if 'workdays_approve' in request.management_permissions %}<a href="{% url 'management_approvals' %}">تایید کارکرد</a>{% endif %}</header>{% block content %}{% endblock %}</main></div>{% block extra_js %}{% endblock %}
-</body></html>
+<aside class="sidebar"><div class="brand"><span class="brand-mark">ک</span><div><b>کارکرد</b><small>پنل حسابداری</small></div></div><nav>{% if 'dashboard' in request.management_permissions %}<a href="{% url 'management_dashboard' %}">داشبورد کارکرد</a>{% endif %}{% if 'employees' in request.management_permissions %}<a href="{% url 'management_employees' %}">کارمندان</a>{% endif %}{% if 'workdays_approve' in request.management_permissions %}<a href="{% url 'management_approvals' %}">تایید کارکرد</a>{% endif %}{% if request.management_user.is_superuser %}<a href="{% url 'admin:index' %}">پنل فنی Django</a>{% endif %}</nav><div class="theme-control"><button type="button" class="theme-toggle" data-theme-toggle aria-label="تغییر تم"><span class="theme-icon">☾</span><span class="theme-label">حالت تیره</span></button></div><div class="side-user">{% if request.management_user %}<span>{{ request.management_user.get_full_name|default:request.management_user.username }}</span><form method="post" action="{% url 'management_logout' %}">{% csrf_token %}<button type="submit">خروج</button></form>{% endif %}</div></aside>
+<main class="main"><header class="mobile-head"><b>پنل حسابداری</b><button type="button" class="theme-toggle mobile-theme-toggle" data-theme-toggle aria-label="تغییر تم"><span class="theme-icon">☾</span><span class="theme-label">حالت تیره</span></button>{% if 'employees' in request.management_permissions %}<a href="{% url 'management_employees' %}">کارمندان</a>{% endif %}{% if 'workdays_approve' in request.management_permissions %}<a href="{% url 'management_approvals' %}">تایید کارکرد</a>{% endif %}</header>{% block content %}{% endblock %}</main></div>{% block extra_js %}{% endblock %}
+<script>
+(function(){
+  const key='karkard-theme';
+  const root=document.documentElement;
+  function apply(theme){
+    root.setAttribute('data-theme', theme);
+    document.querySelectorAll('[data-theme-toggle]').forEach(function(btn){
+      const dark=theme==='dark';
+      btn.querySelector('.theme-icon').textContent=dark?'☀':'☾';
+      btn.querySelector('.theme-label').textContent=dark?'حالت روشن':'حالت تیره';
+      btn.setAttribute('aria-label',dark?'تغییر به حالت روشن':'تغییر به حالت تیره');
+    });
+  }
+  apply(localStorage.getItem(key)||'light');
+  document.addEventListener('DOMContentLoaded',function(){
+    apply(localStorage.getItem(key)||'light');
+    document.querySelectorAll('[data-theme-toggle]').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        const next=root.getAttribute('data-theme')==='dark'?'light':'dark';
+        localStorage.setItem(key,next); apply(next);
+      });
+    });
+  });
+})();
+</script></body></html>

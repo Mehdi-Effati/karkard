@@ -168,6 +168,7 @@ def _build_jalali_calendar(user, m):
             'overtime_hours': str(record.overtime_hours) if record and record.overtime_hours else '',
             'note': record.note if record and record.note else '',
             'checked': record is not None,
+            'is_future': g_date > timezone.localdate(),
             'approval_status': record.approval_status if record else '',
             'approval_status_display': record.get_approval_status_display() if record else '',
             'rejection_reason': record.rejection_reason if record else '',
@@ -350,9 +351,21 @@ def calendar_view(request):
 
     stats = _compute_stats(records.values())
     holiday_map = _holiday_map_for_month(jy, jm)
-    deduction_total = SalaryDeduction.objects.filter(
-        user=effective_user, date__range=(start_date, end_date)
-    ).aggregate(total=Sum('amount')).get('total') or Decimal('0')
+    deductions = list(
+        SalaryDeduction.objects.filter(
+            user=effective_user, date__range=(start_date, end_date)
+        ).select_related('created_by').order_by('-date', '-created_at')
+    )
+    deduction_total = sum((item.amount for item in deductions), Decimal('0'))
+    deduction_details = [
+        {
+            'date': _jalali_date_text(item.date),
+            'amount': item.amount,
+            'reason': item.reason,
+            'created_by': (item.created_by.get_full_name() or item.created_by.username) if item.created_by else '—',
+        }
+        for item in deductions
+    ]
 
     days = []
     for day_num in range(1, month_length + 1):
@@ -368,12 +381,16 @@ def calendar_view(request):
             'overtime_hours': str(record.overtime_hours) if record and record.overtime_hours else '',
             'note': record.note if record and record.note else '',
             'checked': record is not None,
+            'is_future': g_date > timezone.localdate(),
             'approval_status': record.approval_status if record else '',
             'approval_status_display': record.get_approval_status_display() if record else '',
+            'rejection_reason': record.rejection_reason if record and record.approval_status == WorkDay.APPROVAL_REJECTED else '',
             'holiday_title': holiday_map.get(day_num, {}).get('title', ''),
             'holiday_kind': holiday_map.get(day_num, {}).get('kind', ''),
             'holiday_kind_display': holiday_map.get(day_num, {}).get('kind_display', ''),
             'is_past_or_today': (jy, jm, day_num) <= (today_jy, today_jm, today_jd),
+            'is_future': g_date > timezone.localdate(),
+            'is_friday': jalali_weekday(jy, jm, day_num) == 6,
         })
 
     # --- یادآوری روزهای ثبت‌نشده (فقط برای روزهایی که گذشته‌اند، تا امروز) ---
@@ -415,6 +432,7 @@ def calendar_view(request):
         'effective_user': effective_user,
         'is_viewing_employee': bool(view_as_id),
         'deduction_total': deduction_total,
+        'deduction_details': deduction_details,
     }
     return render(request, 'attendance/calendar.html', context)
 
@@ -429,7 +447,7 @@ def _management_employee_queryset():
     ).select_related('employee_profile__department').order_by('first_name', 'username')
 
 def _approval_queryset_for_manager(manager):
-    """Return pending workdays visible to the current management identity.
+    """Return all workdays visible to the current management identity.
 
     Management permissions already determine whether the caller may reach the
     approval endpoints. Once an accountant has the ``workdays_approve``
@@ -438,9 +456,7 @@ def _approval_queryset_for_manager(manager):
     The accountant is still a normal employee and remains in the employee
     lists; department is not an approval-visibility boundary.
     """
-    return WorkDay.objects.filter(
-        approval_status=WorkDay.APPROVAL_PENDING
-    ).select_related(
+    return WorkDay.objects.all().select_related(
         'user', 'user__employee_profile__department'
     ).order_by('date', 'user__first_name', 'user__username')
 
@@ -468,6 +484,7 @@ def admin_employee_calendar(request, user_id):
     return render(request, 'attendance/management/employee_calendar.html', {
         'employee': employee, 'weeks': _build_jalali_calendar(employee, m),
         'weekday_names': WEEKDAY_NAMES_DISPLAY,
+        'first_weekday': m['first_weekday'],
         'month_name': JALALI_MONTH_NAMES[m['jm'] - 1], 'jy': m['jy'], 'jm': m['jm'],
         'prev_y': m['prev_y'], 'prev_m': m['prev_m'], 'next_y': m['next_y'], 'next_m': m['next_m'],
         'status_choices': WorkDay.STATUS_CHOICES, 'can_approve': bool(request.user.is_superuser),
@@ -607,7 +624,7 @@ def management_dashboard(request):
         for employee in employee_list
     ]
     manager = request.management_user
-    pending_count = _approval_queryset_for_manager(manager).count() if _management_permission(manager, 'workdays_approve') else 0
+    pending_count = _approval_queryset_for_manager(manager).filter(approval_status=WorkDay.APPROVAL_PENDING).count() if _management_permission(manager, 'workdays_approve') else 0
     return render(request, 'attendance/management/dashboard.html', {
         'rows': rows, 'departments': Department.objects.all(), 'selected_dept': dept_id,
         'month_name': JALALI_MONTH_NAMES[m['jm'] - 1], 'jy': m['jy'], 'jm': m['jm'],
@@ -736,8 +753,22 @@ def save_day(request):
     except ValueError:
         return JsonResponse({'ok': False, 'error': 'فرمت تاریخ نامعتبر است.'}, status=400)
 
+    # کارمند فقط تا روز جاری اجازه ثبت کارکرد دارد؛ روزهای آینده هم در UI
+    # غیرفعال هستند و هم این محدودیت در سمت سرور enforce می‌شود.
+    if the_date > timezone.localdate() and not _get_management_user(request):
+        return JsonResponse({'ok': False, 'error': 'ثبت کارکرد برای روزهای آینده امکان‌پذیر نیست.'}, status=403)
+
+    # جمعه فقط دو حالت مجاز دارد: Off یا جمعه‌کاری. در روزهای دیگر،
+    # جمعه‌کاری مجاز نیست. این محدودیت در سمت سرور هم enforce می‌شود.
+    jy_d, jm_d, jd_d = gregorian_to_jalali(the_date.year, the_date.month, the_date.day)
+    is_friday = jalali_weekday(jy_d, jm_d, jd_d) == 6
+
     if status and status not in VALID_STATUSES:
         return JsonResponse({'ok': False, 'error': 'وضعیت انتخاب‌شده نامعتبر است.'}, status=400)
+    if is_friday and status and status not in {WorkDay.STATUS_FRIDAY_WORK, WorkDay.STATUS_OFF}:
+        return JsonResponse({'ok': False, 'error': 'در روز جمعه فقط «جمعه کاری» یا «Off» قابل ثبت است.'}, status=400)
+    if not is_friday and status == WorkDay.STATUS_FRIDAY_WORK:
+        return JsonResponse({'ok': False, 'error': 'جمعه کاری فقط برای روز جمعه قابل ثبت است.'}, status=400)
 
     overtime_hours = None
     if overtime_raw:
@@ -799,35 +830,96 @@ def delete_day(request):
     except ValueError:
         return JsonResponse({'ok': False, 'error': 'فرمت تاریخ نامعتبر است.'}, status=400)
 
+    if the_date > timezone.localdate() and not _get_management_user(request):
+        return JsonResponse({'ok': False, 'error': 'حذف کارکرد برای روزهای آینده امکان‌پذیر نیست.'}, status=403)
+
     WorkDay.objects.filter(user=_effective_calendar_user(request), date=the_date).delete()
     return JsonResponse({'ok': True, 'date': iso_date})
 
 
 @management_permission_required('workdays_approve')
 def management_approvals(request):
-    manager = request.management_user
-    User = get_user_model()
-    search = (request.GET.get('q') or '').strip()
+    """تقویم ماهانه تایید کارکرد؛ هر روز یک پاپ‌آپ از کارمندهای ثبت‌کننده دارد."""
+    m = _resolve_month(request)
     employees = _management_employee_queryset()
-    if search:
-        employees = employees.filter(
-            Q(first_name__icontains=search) | Q(last_name__icontains=search) |
-            Q(username__icontains=search) | Q(employee_profile__department__name__icontains=search)
-        )
-    # حسابدارِ دارای دسترسی تایید کارکرد باید کل کارکنان را ببیند، نه فقط افراد بخش خودش.
-    # Superuser و Accountant هر دو از همین فهرست کامل استفاده می‌کنند؛ محدودیت دسترسی
-    # حسابدار فقط از طریق management_permissions اعمال می‌شود.
-    pending_counts = {row['user_id']: row['count'] for row in WorkDay.objects.filter(
-        approval_status=WorkDay.APPROVAL_PENDING, user__in=employees
-    ).values('user_id').annotate(count=Count('id'))}
-    employee_cards = []
-    for employee in employees:
-        count = pending_counts.get(employee.id, 0)
-        employee_cards.append({'employee': employee, 'pending': count})
+    employee_ids = list(employees.values_list('id', flat=True))
+    workdays = list(
+        WorkDay.objects.filter(
+            user_id__in=employee_ids,
+            date__range=(m['start_date'], m['end_date']),
+        ).select_related('user').order_by('date', 'user__first_name', 'user__username')
+    )
+    by_date = {}
+    for wd in workdays:
+        display_name = wd.user.get_full_name() or wd.user.username
+        by_date.setdefault(wd.date.isoformat(), []).append({
+            'id': wd.id,
+            'employee_id': wd.user_id,
+            'employee': display_name,
+            'username': wd.user.username,
+            'status': wd.status,
+            'status_display': wd.get_status_display(),
+            'overtime_hours': str(wd.overtime_hours) if wd.overtime_hours else '',
+            'note': wd.note or '',
+            'approval_status': wd.approval_status,
+            'approval_status_display': wd.get_approval_status_display(),
+            'rejection_reason': wd.rejection_reason or '',
+        })
+
+    today = timezone.localdate()
+    approval_days = []
+    for day_num in range(1, m['month_length'] + 1):
+        gy, gm, gd = jalali_to_gregorian(m['jy'], m['jm'], day_num)
+        g_date = datetime.date(gy, gm, gd)
+        iso = g_date.isoformat()
+        records = by_date.get(iso, [])
+        unapproved = sum(1 for row in records if row['approval_status'] != WorkDay.APPROVAL_APPROVED)
+        if g_date > today:
+            state = 'future'
+            count = 0
+        elif not records:
+            state = 'unregistered'
+            count = 0
+        elif unapproved:
+            state = 'pending'
+            count = unapproved
+        else:
+            state = 'approved'
+            count = 0
+        approval_days.append({
+            'jalali_day': day_num,
+            'jalali_date': f'{m["jy"]:04d}/{m["jm"]:02d}/{day_num:02d}',
+            'gregorian': f'{gy:04d}/{gm:02d}/{gd:02d}',
+            'iso_date': iso,
+            'state': state,
+            'count': count,
+            'records': records,
+        })
+
+    # Keep the complete employee roster in the page data so the approval
+    # screen knows about every employee (including accountants and employees
+    # from other departments). The popup itself renders only employees who
+    # actually registered a WorkDay for the selected date.
+    approval_employee_roster = [
+        {
+            'id': employee.id,
+            'employee': employee.get_full_name() or employee.username,
+            'username': employee.username,
+        }
+        for employee in employees
+    ]
+
     return render(request, 'attendance/management/approvals.html', {
-        'employee_cards': employee_cards,
-        'search': search,
-        'pending_total': sum(pending_counts.values()),
+        'approval_days': approval_days,
+        'approval_employee_roster': approval_employee_roster,
+        'weekday_names': WEEKDAY_NAMES_DISPLAY,
+        'first_weekday': m['first_weekday'],
+        'month_name': JALALI_MONTH_NAMES[m['jm'] - 1],
+        'jy': m['jy'], 'jm': m['jm'],
+        'prev_y': m['prev_y'], 'prev_m': m['prev_m'],
+        'next_y': m['next_y'], 'next_m': m['next_m'],
+        'pending_total': sum(1 for wd in workdays if wd.approval_status != WorkDay.APPROVAL_APPROVED),
+        'can_approve': True,
     })
 
 
@@ -841,7 +933,9 @@ def management_approve_workday(request, workday_id):
     work_day.approved_at = timezone.now()
     work_day.rejection_reason = ''
     work_day.save(update_fields=['approval_status', 'approved_by', 'approved_at', 'rejection_reason', 'updated_at'])
-    return redirect(f"{reverse('management_approvals')}?date={work_day.date.isoformat()}")
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+        return JsonResponse({'ok': True, 'workday_id': work_day.id, 'approval_status': work_day.approval_status, 'approval_status_display': work_day.get_approval_status_display()})
+    return redirect(f"{reverse('management_approvals')}?y={request.GET.get('y', '')}&m={request.GET.get('m', '')}")
 
 
 @management_permission_required('workdays_approve')
@@ -857,7 +951,9 @@ def management_reject_workday(request, workday_id):
     work_day.approved_at = timezone.now()
     work_day.rejection_reason = reason[:2000]
     work_day.save(update_fields=['approval_status', 'approved_by', 'approved_at', 'rejection_reason', 'updated_at'])
-    return redirect(f"{reverse('management_approvals')}?date={work_day.date.isoformat()}")
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+        return JsonResponse({'ok': True, 'workday_id': work_day.id, 'approval_status': work_day.approval_status, 'approval_status_display': work_day.get_approval_status_display(), 'rejection_reason': work_day.rejection_reason})
+    return redirect(f"{reverse('management_approvals')}?y={request.GET.get('y', '')}&m={request.GET.get('m', '')}")
 
 
 @management_permission_required('workdays_approve')
@@ -870,7 +966,7 @@ def management_approve_date(request):
     except ValueError:
         return redirect('management_approvals')
     now = timezone.now()
-    count = _approval_queryset_for_manager(manager).filter(date=selected).update(
+    count = _approval_queryset_for_manager(manager).filter(date=selected, approval_status=WorkDay.APPROVAL_PENDING).update(
         approval_status=WorkDay.APPROVAL_APPROVED,
         approved_by=manager,
         approved_at=now,

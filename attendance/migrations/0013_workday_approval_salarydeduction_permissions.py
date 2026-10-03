@@ -4,15 +4,6 @@ import django.core.validators
 import django.db.models.deletion
 
 
-def approve_existing_workdays(apps, schema_editor):
-    WorkDay = apps.get_model('attendance', 'WorkDay')
-    WorkDay.objects.all().update(
-        approval_status='approved',
-        approved_by=None,
-        approved_at=None,
-        rejection_reason='',
-    )
-
 
 def update_accountant_permissions(apps, schema_editor):
     EmployeeProfile = apps.get_model('attendance', 'EmployeeProfile')
@@ -92,6 +83,5 @@ class Migration(migrations.Migration):
                 'ordering': ['-date', '-created_at'],
             },
         ),
-        migrations.RunPython(approve_existing_workdays, noop),
         migrations.RunPython(update_accountant_permissions, noop),
     ]

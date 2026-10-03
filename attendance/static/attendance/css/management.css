@@ -47,3 +47,199 @@ body .modal-overlay .danger-btn{background:#fff1f2!important;color:#be123c!impor
 .deduction-panel{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:20px;box-shadow:0 12px 34px rgba(31,41,55,.06)}
 .section-head{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:14px}.section-head h2{font-size:17px;margin:0 0 4px}.section-head p{font-size:11px;color:var(--muted);margin:0}.deduction-table{min-width:720px}.reason-cell{white-space:normal!important;max-width:320px}.danger-outline{background:#fff1f2!important;color:#be123c!important;border:1px solid #fecdd3!important;box-shadow:none!important}.row-actions{display:flex;gap:6px;align-items:center;justify-content:center}.row-actions form{margin:0}.deduction-table td{vertical-align:middle}
 @media(max-width:680px){.section-head{align-items:stretch;flex-direction:column}.section-head .primary{width:100%}}
+
+/* ===== Theme toggle (v25) ===== */
+.theme-control{margin-top:18px;padding:0 8px}.theme-toggle{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid rgba(148,163,184,.25);background:#fff;color:#334155;border-radius:10px;padding:9px 12px;font:600 11px Vazirmatn,Tahoma,sans-serif;cursor:pointer;transition:.15s ease}.theme-toggle:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(15,23,42,.10)}.theme-icon{font-size:15px;line-height:1}.sidebar .theme-toggle{width:100%;background:#1f2937;color:#e5e7eb;border-color:#374151}.sidebar .theme-toggle:hover{background:#273449;color:#fff}.main .theme-toggle{float:left;margin-bottom:12px}
+html[data-theme="dark"] body{background:linear-gradient(145deg,#0b1220,#111827 52%,#172033);color:#e5e7eb}html[data-theme="dark"] .main{color:#e5e7eb}html[data-theme="dark"] .page-head h1,html[data-theme="dark"] .section-head h2,html[data-theme="dark"] .cards b{color:#f8fafc}html[data-theme="dark"] .page-head p,html[data-theme="dark"] .page-head .eyebrow,html[data-theme="dark"] .cards span,html[data-theme="dark"] .hint,html[data-theme="dark"] .empty,html[data-theme="dark"] .approval-card small{color:#94a3b8}html[data-theme="dark"] .cards>div,html[data-theme="dark"] .table-card,html[data-theme="dark"] .employee-card,html[data-theme="dark"] .management-panel,html[data-theme="dark"] .approval-card,html[data-theme="dark"] .empty-card,html[data-theme="dark"] .approval-total,html[data-theme="dark"] .approval-search input,html[data-theme="dark"] .approval-toolbar input,html[data-theme="dark"] .toolbar select,html[data-theme="dark"] .month,html[data-theme="dark"] .secondary{background:#182131;color:#e5e7eb;border-color:#2d3a4d}html[data-theme="dark"] th{background:#111827;color:#94a3b8;border-color:#2d3a4d}html[data-theme="dark"] td{border-color:#263244;color:#dbe4ee}html[data-theme="dark"] .toolbar select,html[data-theme="dark"] .form-grid input,html[data-theme="dark"] .form-grid select,html[data-theme="dark"] .mini-form input{background:#111827;color:#e5e7eb;border-color:#334155}html[data-theme="dark"] .month a{background:#25233e}html[data-theme="dark"] .approval-details span{background:#111827;border-color:#2d3a4d;color:#cbd5e1}html[data-theme="dark"] .mini-form{background:#182131;border-color:#334155}html[data-theme="dark"] .mini-form input{color:#e5e7eb}html[data-theme="dark"] .secondary{color:#e5e7eb}html[data-theme="dark"] .modal-overlay .center-modal{background:#182131!important;color:#e5e7eb!important;border-color:#334155!important}html[data-theme="dark"] .modal-overlay .center-modal h2{color:#f8fafc!important}html[data-theme="dark"] .modal-overlay .center-modal p{color:#94a3b8!important}html[data-theme="dark"] .modal-overlay .modal-form input,html[data-theme="dark"] .modal-overlay .modal-form select,html[data-theme="dark"] .modal-overlay .modal-form textarea{background:#111827!important;color:#e5e7eb!important;border-color:#334155!important}html[data-theme="dark"] .modal-overlay .modal-x{background:#263244;color:#e5e7eb}
+@media(max-width:680px){.main .theme-toggle{float:none;margin:0 0 10px 0}}
+.mobile-theme-toggle{display:none}.mobile-head .mobile-theme-toggle{margin:0 0 0 auto;width:auto}.sidebar .theme-control{display:block}
+@media(max-width:680px){.mobile-head .mobile-theme-toggle{display:inline-flex}.sidebar .theme-control{display:none}}
+
+/* v27 theme readability refinements */
+html[data-theme="dark"] .approval-modal-box {
+  background: #000 !important;
+  color: #fff !important;
+}
+html[data-theme="dark"] .approval-modal-box h2,
+html[data-theme="dark"] .approval-modal-box .approval-modal-meta,
+html[data-theme="dark"] .approval-modal-box .approval-modal-details,
+html[data-theme="dark"] .approval-modal-box .approval-modal-details span,
+html[data-theme="dark"] .approval-modal-box .approval-modal-details b,
+html[data-theme="dark"] .approval-modal-box .approval-modal-details p {
+  color: #fff !important;
+}
+html[data-theme="dark"] .approval-modal-box .approval-modal-details > div {
+  background: #000 !important;
+  color: #fff !important;
+  border-color: #333 !important;
+}
+html[data-theme="dark"] .approval-modal-box .modal-close {
+  color: #fff !important;
+}
+
+html[data-theme="dark"] .approval-legend,
+html[data-theme="dark"] .approval-status span,
+html[data-theme="dark"] .calendar-status-legend,
+html[data-theme="dark"] .deduction-hover-title { color: #fff !important; }
+
+/* ===== Theme readability fixes (v28) ===== */
+html[data-theme="dark"] .approval-employee-card,
+html[data-theme="dark"] .deduction-panel,
+html[data-theme="dark"] .jalali-modal,
+html[data-theme="dark"] .approval-calendar .weekday-row > div,
+html[data-theme="dark"] .approval-calendar .approval-day,
+html[data-theme="dark"] .approval-calendar {
+  background: #111827 !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+html[data-theme="dark"] .approval-employee-card:hover,
+html[data-theme="dark"] .approval-calendar .approval-day:hover {
+  background: #182131 !important;
+}
+
+html[data-theme="dark"] .employee-info,
+html[data-theme="dark"] .employee-info h3,
+html[data-theme="dark"] .employee-info span,
+html[data-theme="dark"] .employee-info small,
+html[data-theme="dark"] .page-head p,
+html[data-theme="dark"] .page-head .eyebrow,
+html[data-theme="dark"] .cards span,
+html[data-theme="dark"] .hint,
+html[data-theme="dark"] .empty,
+html[data-theme="dark"] .approval-card small,
+html[data-theme="dark"] .approval-summary {
+  color: #f8fafc !important;
+}
+
+html[data-theme="dark"] .work,
+html[data-theme="dark"] .night,
+html[data-theme="dark"] .holiday,
+html[data-theme="dark"] .friday,
+html[data-theme="dark"] .leave,
+html[data-theme="dark"] .off {
+  color: #000 !important;
+}
+
+html[data-theme="dark"] .deduction,
+html[data-theme="dark"] .approval-legend,
+html[data-theme="dark"] .approval-status span,
+html[data-theme="dark"] .calendar-status-legend,
+html[data-theme="dark"] .deduction-hover-title {
+  color: #fff !important;
+}
+
+html[data-theme="dark"] .approval-modal-box,
+html[data-theme="dark"] .deduction-hover-table {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+html[data-theme="dark"] .approval-modal-box h2,
+html[data-theme="dark"] .approval-modal-box .approval-modal-meta,
+html[data-theme="dark"] .approval-modal-box .approval-modal-details,
+html[data-theme="dark"] .approval-modal-box .approval-modal-details span,
+html[data-theme="dark"] .approval-modal-box .approval-modal-details b,
+html[data-theme="dark"] .approval-modal-box .approval-modal-details p,
+html[data-theme="dark"] .deduction-hover-table th,
+html[data-theme="dark"] .deduction-hover-table td {
+  color: #fff !important;
+}
+
+html[data-theme="dark"] .deduction-hover-table th,
+html[data-theme="dark"] .deduction-hover-table td {
+  background: #000 !important;
+  border-color: #333 !important;
+}
+
+.panel-row {
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.stat-item {
+  padding: 8px 25px;
+}
+
+/* v29: preserve approval status colors and use the existing navy dark theme */
+html[data-theme="dark"] .approval-calendar .approval-day.approval-approved {
+  border-top-color: var(--green) !important;
+}
+html[data-theme="dark"] .approval-calendar .approval-day.approval-pending {
+  border-top-color: var(--red) !important;
+}
+html[data-theme="dark"] .approval-calendar .approval-day.approval-rejected {
+  border-top-color: var(--amber) !important;
+}
+html[data-theme="dark"] .approval-calendar .approval-day small {
+  color: #fff !important;
+}
+html[data-theme="dark"] .approval-modal-box,
+html[data-theme="dark"] .deduction-hover-table {
+  background: #182131 !important;
+  color: #fff !important;
+  border-color: #334155 !important;
+}
+html[data-theme="dark"] .deduction-hover-table th,
+html[data-theme="dark"] .deduction-hover-table td {
+  background: #182131 !important;
+  color: #fff !important;
+  border-color: #334155 !important;
+}
+
+/* ===== Approval monthly calendar (v30) ===== */
+.approval-month-toolbar{justify-content:flex-start;margin-bottom:14px}
+.approval-overview-calendar{background:#fff;border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:0 12px 34px rgba(31,41,55,.06)}
+.approval-overview-calendar .weekday-row{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-bottom:8px}
+.approval-overview-calendar .weekday-row>div{text-align:center;padding:9px 4px;background:#f8fafc;border:1px solid var(--line);border-radius:10px;color:#64748b;font-size:10px;font-weight:700}
+.approval-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.approval-overview-day{width:100%;min-height:105px;border:1px solid var(--line);border-top:5px solid #cbd5e1;border-radius:12px;background:#fff;color:var(--ink);padding:10px 7px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font:inherit;transition:.15s}
+.approval-overview-day:first-child{grid-column-start:calc(var(--first-day) + 1)}
+.approval-overview-day:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(15,23,42,.08)}
+.approval-overview-day.state-approved{border-top-color:var(--green);background:#f0fdf4}
+.approval-overview-day.state-pending{border-top-color:var(--red);background:#fff7f8}
+.approval-overview-day.state-unregistered,.approval-overview-day.state-future{border-top-color:#94a3b8;background:#f1f5f9;color:#64748b}
+.approval-overview-number{font-size:23px;font-weight:800}
+.day-state-label{font-size:9px;color:#64748b}
+.state-approved .day-state-label{color:var(--green)}
+.day-pending-count{display:grid;place-items:center;min-width:30px;height:30px;border-radius:50%;background:var(--red);color:#fff;font-size:13px;font-weight:800}
+.approval-calendar-key{display:inline-block;width:30px;height:5px;border-radius:4px;margin-left:5px;vertical-align:middle}
+.approval-calendar-key.approved{background:var(--green)}
+.approval-calendar-key.pending{background:var(--red)}
+.approval-calendar-key.unregistered{background:#94a3b8}
+.approval-overview-modal{display:none;position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.58);backdrop-filter:blur(5px);align-items:center;justify-content:center;padding:20px}
+.approval-overview-modal.open{display:flex}
+.approval-overview-modal-box{position:relative;width:min(720px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 30px 100px rgba(0,0,0,.28)}
+.approval-overview-modal-head{padding-left:25px;margin-bottom:14px}
+.approval-overview-modal-head h2{margin:4px 0;font-size:20px}
+.approval-overview-modal-head p{margin:0;color:var(--muted);font-size:11px}
+.approval-person-list{display:grid;gap:9px}
+.approval-person-row{display:grid;grid-template-columns:1.1fr 1.2fr auto auto;gap:10px;align-items:center;padding:12px;border:1px solid var(--line);border-right:5px solid #94a3b8;border-radius:13px;background:#f8fafc}
+.approval-person-row.shift-work{border-right-color:var(--c-work,#10b981)}
+.approval-person-row.shift-night{border-right-color:var(--c-night,#3b82f6)}
+.approval-person-row.shift-holiday{border-right-color:var(--c-holiday,#ef4a5b)}
+.approval-person-row.shift-friday{border-right-color:var(--c-friday,#a855f7)}
+.approval-person-row.shift-leave{border-right-color:var(--c-leave,#f0b23e)}
+.approval-person-row.shift-off{border-right-color:var(--c-off,#8b93a1)}
+.approval-person-main strong{display:block;font-size:12px}.approval-person-main small{display:block;color:var(--muted);font-size:9px;margin-top:3px}
+.approval-person-shift{display:grid;gap:3px}.approval-person-shift b{font-size:11px}.approval-person-shift span{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:250px}
+.person-approval{font-size:10px;font-weight:700;white-space:nowrap}.person-approval.approved{color:var(--green)}.person-approval.pending{color:var(--red)}.person-approval.rejected{color:var(--amber)}
+.approval-person-buttons{display:flex;gap:5px}.approval-person-buttons button{white-space:nowrap}
+.approval-no-records{padding:28px;text-align:center;border:1px dashed var(--line);border-radius:13px;color:var(--muted);font-size:11px;background:#f8fafc}
+html[data-theme="dark"] .approval-overview-calendar,html[data-theme="dark"] .approval-overview-modal-box{background:#182131!important;color:#f8fafc!important;border-color:#334155!important}
+html[data-theme="dark"] .approval-overview-calendar .weekday-row>div,html[data-theme="dark"] .approval-overview-day{background:#111827;color:#f8fafc;border-color:#334155}
+html[data-theme="dark"] .approval-overview-day.state-approved{background:#10261d}
+html[data-theme="dark"] .approval-overview-day.state-pending{background:#2a1820}
+html[data-theme="dark"] .approval-overview-day.state-unregistered,html[data-theme="dark"] .approval-overview-day.state-future{background:#111827;color:#94a3b8}
+html[data-theme="dark"] .approval-person-row{background:#111827;border-color:#334155}
+html[data-theme="dark"] .approval-person-shift span,html[data-theme="dark"] .approval-person-main small,html[data-theme="dark"] .approval-overview-modal-head p{color:#cbd5e1}
+html[data-theme="dark"] .approval-no-records{background:#111827;color:#cbd5e1;border-color:#334155}
+@media(max-width:800px){.approval-person-row{grid-template-columns:1fr 1fr}.approval-person-action,.approval-person-buttons{justify-content:flex-start}.approval-person-buttons{grid-column:1/-1}.approval-overview-day{min-height:88px}}
+@media(max-width:600px){.approval-overview-calendar{padding:8px;overflow-x:auto}.approval-overview-calendar .weekday-row,.approval-month-grid{min-width:620px;gap:5px}.approval-overview-modal-box{padding:18px}.approval-person-row{grid-template-columns:1fr}.approval-person-action,.approval-person-buttons{grid-column:auto}}
+
+/* v33: navy approval modal, not pure black */
+html[data-theme="dark"] .approval-overview-modal-box{background:#182131!important;color:#e5e7eb!important;border-color:#334155!important}
+html[data-theme="dark"] .approval-overview-modal-box h2,html[data-theme="dark"] .approval-overview-modal-box p,html[data-theme="dark"] .approval-overview-modal-box .eyebrow{color:#f8fafc!important}
+/* v33: approved records can be explicitly revoked/rejected */
+.approval-person-buttons .reject-btn{white-space:nowrap}

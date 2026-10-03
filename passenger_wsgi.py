@@ -1,0 +1,1 @@
+from karkard.wsgi import application

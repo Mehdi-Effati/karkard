@@ -1,19 +1,57 @@
 {% extends 'attendance/management_base.html' %}
+{% load static %}
 {% block title %}تایید کارکرد{% endblock %}
 {% block content %}
 <div class="page-head">
-  <div><span class="eyebrow">کنترل کارکرد</span><h1>تایید کارکرد کارکنان</h1><p>وضعیت تایید هر کارمند را یکجا ببینید و برای بررسی وارد تقویم او شوید.</p></div>
-  <div class="approval-total"><b>{{ pending_total }}</b><span>روز در انتظار تایید</span></div>
+  <div><span class="eyebrow">کنترل کارکرد</span><h1>تایید کارکرد کارکنان</h1><p>روز موردنظر را از تقویم انتخاب کنید تا فقط کارکردهای ثبت‌شده همان روز نمایش داده شود.</p></div>
+  <div class="approval-total"><b>{{ pending_total }}</b><span>کارکرد تایید نشده</span></div>
 </div>
-<div class="approval-toolbar approval-search"><form method="get"><input name="q" value="{{ search }}" placeholder="جستجوی نام، نام کاربری یا بخش..."><button class="primary" type="submit">جستجو</button>{% if search %}<a class="secondary" href="{% url 'management_approvals' %}">حذف جستجو</a>{% endif %}</form></div>
-<div class="approval-legend"><span><i class="approval-dot-card ok"></i> بدون روز تاییدنشده</span><span><i class="approval-dot-card pending"></i> دارای روز تاییدنشده</span></div>
-<div class="approval-employee-grid">
-{% for card in employee_cards %}
-  <a class="approval-employee-card" href="{% url 'management_employee_calendar' card.employee.id %}">
-    <div class="avatar">{{ card.employee.first_name|default:card.employee.username|slice:':1' }}</div>
-    <div class="approval-employee-info"><strong>{{ card.employee.get_full_name|default:card.employee.username }}</strong><small>@{{ card.employee.username }} · {{ card.employee.employee_profile.department.name|default:'بدون بخش' }}</small></div>
-    <div class="approval-status {% if card.pending %}has-pending{% else %}all-clear{% endif %}"><i></i>{% if card.pending %}<b>{{ card.pending }}</b><span>روز تایید نشده</span>{% else %}<span>همه تایید شده</span>{% endif %}</div>
-  </a>
-{% empty %}<div class="empty-card">کارمندی برای نمایش پیدا نشد.</div>{% endfor %}
+
+<div class="approval-toolbar approval-month-toolbar">
+  <div class="month"><a href="?y={{prev_y}}&m={{prev_m}}">‹</a><strong>{{month_name}} {{jy}}</strong><a href="?y={{next_y}}&m={{next_m}}">›</a></div>
 </div>
+
+<div class="approval-legend">
+  <span><i class="approval-calendar-key approved"></i> همه کارکردهای ثبت‌شده تایید شده</span>
+  <span><i class="approval-calendar-key pending"></i> کارکرد تاییدنشده</span>
+  <span><i class="approval-calendar-key unregistered"></i> ثبت نشده / روز آینده</span>
+</div>
+
+<div class="approval-overview-calendar">
+  <div class="weekday-row">{% for wd in weekday_names %}<div>{{wd}}</div>{% endfor %}</div>
+  <div class="approval-month-grid" style="--first-day: {{first_weekday}};">
+    {% for day in approval_days %}
+      <button type="button" class="approval-overview-day state-{{day.state}}" data-day-index="{{forloop.counter0}}">
+        <span class="approval-overview-number">{{day.jalali_day}}</span>
+        {% if day.state == 'approved' %}<small class="day-state-label">تایید شده</small>
+        {% elif day.state == 'pending' %}<small class="day-pending-count">{{day.count}}</small>
+        {% elif day.state == 'future' %}<small class="day-state-label">ثبت نشده</small>
+        {% else %}<small class="day-state-label">ثبت نشده</small>{% endif %}
+      </button>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="approval-overview-modal" id="approval-overview-modal" aria-hidden="true">
+  <div class="approval-overview-modal-box">
+    <button type="button" class="modal-close" id="approval-overview-close">×</button>
+    <div class="approval-overview-modal-head">
+      <div><span class="eyebrow">جزئیات روز</span><h2 id="approval-overview-title">—</h2><p id="approval-overview-meta">—</p></div>
+    </div>
+    <div id="approval-overview-list" class="approval-person-list"></div>
+  </div>
+</div>
+
+{{ approval_days|json_script:"approval-days-data" }}
+{{ approval_employee_roster|json_script:"approval-employees-data" }}
+<div hidden aria-hidden="true" id="approval-employee-roster-text">{% for employee in approval_employee_roster %}<span>{{ employee.employee }}</span>{% endfor %}</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+window.CSRF_TOKEN='{{ csrf_token }}';
+window.CAN_APPROVE={{ can_approve|yesno:"true,false" }};
+window.APPROVE_URL_TEMPLATE='{% url 'management_approve_workday' 0 %}';
+window.REJECT_URL_TEMPLATE='{% url 'management_reject_workday' 0 %}';
+</script>
+<script src="{% static 'attendance/js/approval-calendar.js' %}?v=30"></script>
 {% endblock %}

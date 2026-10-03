@@ -9,13 +9,14 @@
   <link rel="manifest" href="{% static 'attendance/manifest.json' %}">
   <link rel="icon" href="{% static 'attendance/icons/icon-192.png' %}">
   <link rel="apple-touch-icon" href="{% static 'attendance/icons/icon-192.png' %}">
-  <link rel="stylesheet" href="{% static 'attendance/css/style.css' %}">
+  <link rel="stylesheet" href="{% static 'attendance/css/style.css' %}?v=25">
+  <script>(function(){var t=localStorage.getItem('karkard-theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
   {% if is_viewing_employee %}<div class="view-as-banner">در حال مشاهده تقویم <b>{{ effective_user.get_full_name|default:effective_user.username }}</b> از دید کارمند <form method="post" action="{% url 'management_stop_view_as' %}" class="inline-form">{% csrf_token %}<button type="submit">بازگشت به پنل حسابداری</button></form></div>{% endif %}
   <div class="topbar">
     <div class="brand"><span class="dot-logo"></span> تقویم کاری</div>
-    <div class="user-area">
+    <div class="user-area"><button type="button" class="theme-toggle" data-theme-toggle aria-label="تغییر تم"><span class="theme-icon">☾</span><span class="theme-label">حالت تیره</span></button>
       <span>{{ effective_user.first_name|default:effective_user.username }} عزیز</span>
       <form method="post" action="{% if is_viewing_employee %}{% url 'management_stop_view_as' %}{% else %}{% url 'logout' %}{% endif %}">
         {% csrf_token %}
@@ -50,7 +51,7 @@
           <div class="stat-item c-friday"><div class="num">{{ stats.friday_work }}</div><div class="lbl">جمعه‌کاری</div></div>
           <div class="stat-item c-leave"><div class="num">{{ stats.leave }}</div><div class="lbl">مرخصی</div></div>
           <div class="stat-item c-off"><div class="num">{{ stats.off }}</div><div class="lbl">Off</div></div>
-          <div class="stat-item c-overtime"><div class="num">{{ stats.overtime_hours }}</div><div class="lbl">ساعت اضافه‌کاری</div></div><div class="stat-item c-deduction"><div class="num">{{ deduction_total }}</div><div class="lbl">کسر حقوق</div></div>
+          <div class="stat-item c-overtime"><div class="num">{{ stats.overtime_hours }}</div><div class="lbl">ساعت اضافه‌کاری</div></div><div class="stat-item c-deduction deduction-summary-card"><div class="num">{{ deduction_total }}</div><div class="lbl">کسر حقوق</div>{% if deduction_details %}<div class="deduction-hover-card"><div class="deduction-hover-title">جزئیات کسر حقوق {{ month_name }}</div><div class="deduction-table-wrap"><table class="deduction-hover-table"><thead><tr><th>تاریخ</th><th>مبلغ</th><th>دلیل</th><th>ثبت‌کننده</th></tr></thead><tbody>{% for item in deduction_details %}<tr><td>{{ item.date }}</td><td>{{ item.amount }}</td><td>{{ item.reason }}</td><td>{{ item.created_by }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}</div>
         </div>
       </div>
     </div>
@@ -79,20 +80,21 @@
         <div class="week-row">
           {% for day in week %}
             {% if day %}
-              <div class="day-cell {% if day.status %}st-{{ day.status }}{% endif %} {% if day.is_today %}today{% endif %} {% if day.holiday_title %}is-holiday{% endif %}"
+              <div class="day-cell {% if day.status %}st-{{ day.status }}{% endif %} {% if day.is_today %}today{% endif %} {% if day.is_future %}future-day{% endif %} {% if day.holiday_title %}is-holiday{% endif %}"
                    data-date="{{ day.iso_date }}"
                    data-gdate="{{ day.gregorian }}"
                    data-status="{{ day.status|default:'' }}"
                    data-overtime="{{ day.overtime_hours }}"
                    data-note="{{ day.note }}"
                    data-holiday="{{ day.holiday_title }}" data-holiday-kind="{{ day.holiday_kind }}"
-                   data-checked="{% if day.checked %}1{% else %}0{% endif %}" data-approval="{{ day.approval_status }}"
+                   data-checked="{% if day.checked %}1{% else %}0{% endif %}" data-approval="{{ day.approval_status }}" data-friday="{% if day.is_friday %}1{% else %}0{% endif %}"
                    {% if day.holiday_title %}title="تعطیل رسمی: {{ day.holiday_title }}"{% endif %}>
                 {% if day.holiday_title %}<div class="holiday-dot {% if day.holiday_kind == 'government' %}government{% endif %}"></div>{% endif %}
                 {% if day.note %}<div class="note-dot" title="یادداشت دارد">📝</div>{% endif %}{% if day.approval_status == 'approved' %}<div class="approval-dot approved" title="تایید شده">✓</div>{% elif day.approval_status == 'rejected' %}<div class="approval-dot rejected" title="رد شده">!</div>{% elif day.approval_status == 'pending' %}<div class="approval-dot pending" title="در انتظار تایید">•</div>{% endif %}
                 <div class="day-number">{{ day.jalali_day }}</div>
                 <div class="gdate">{{ day.gregorian }}</div>
-                <input type="checkbox" class="day-check" autocomplete="off" {% if day.checked %}checked{% endif %}>
+                {% if day.approval_status == 'rejected' %}<span class="rejected-label">رد شده{% if day.rejection_reason %}<span class="rejection-tooltip">{{ day.rejection_reason }}</span>{% endif %}</span>{% endif %}
+                <input type="checkbox" class="day-check" autocomplete="off" {% if day.checked %}checked{% endif %} {% if day.is_future %}disabled{% endif %}>
               </div>
             {% else %}
               <div class="day-cell empty"></div>
@@ -144,6 +146,66 @@
   </div>
 
   <script>
+    /* Deduction details: show on hover, keep open on click, and allow the user
+       to move into the centered table and scroll without losing it. */
+    document.addEventListener('DOMContentLoaded', function () {
+      const card = document.querySelector('.deduction-summary-card');
+      const detail = card ? card.querySelector('.deduction-hover-card') : null;
+      if (!card || !detail) return;
+
+      let pinned = false;
+      let overCard = false;
+      let overDetail = false;
+
+      const sync = () => {
+        card.classList.toggle('deduction-details-open', pinned || overCard || overDetail);
+      };
+
+      card.addEventListener('mouseenter', function () {
+        overCard = true;
+        sync();
+      });
+
+      card.addEventListener('mouseleave', function () {
+        overCard = false;
+        sync();
+      });
+
+      detail.addEventListener('mouseenter', function () {
+        overDetail = true;
+        sync();
+      });
+
+      detail.addEventListener('mouseleave', function () {
+        overDetail = false;
+        sync();
+      });
+
+      card.addEventListener('click', function (event) {
+        if (event.target.closest('.deduction-hover-card')) return;
+        pinned = !pinned;
+        sync();
+      });
+
+      /* Clicking anywhere outside the centered panel or summary card closes a
+         click-pinned panel. */
+      document.addEventListener('click', function (event) {
+        if (!pinned) return;
+        if (card.contains(event.target)) return;
+        pinned = false;
+        sync();
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && pinned) {
+          pinned = false;
+          sync();
+        }
+      });
+    });
+  </script>
+
+  <script>
     const SAVE_URL = "{% url 'save_day' %}";
     const DELETE_URL = "{% url 'delete_day' %}";
   </script>
@@ -156,6 +218,10 @@
       document.querySelectorAll('[data-close-modal]').forEach(b => b.addEventListener('click', () => close(document.getElementById(b.dataset.closeModal))));
       document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) close(m); }));
       document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(close); });
+      const themeRoot=document.documentElement; const themeKey='karkard-theme';
+      const applyTheme=theme=>{themeRoot.setAttribute('data-theme',theme);document.querySelectorAll('[data-theme-toggle]').forEach(btn=>{const dark=theme==='dark';btn.querySelector('.theme-icon').textContent=dark?'☀':'☾';btn.querySelector('.theme-label').textContent=dark?'حالت روشن':'حالت تیره';btn.setAttribute('aria-label',dark?'تغییر به حالت روشن':'تغییر به حالت تیره')})};
+      applyTheme(localStorage.getItem(themeKey)||'light');
+      document.querySelectorAll('[data-theme-toggle]').forEach(btn=>btn.addEventListener('click',()=>{const next=themeRoot.getAttribute('data-theme')==='dark'?'light':'dark';localStorage.setItem(themeKey,next);applyTheme(next)}));
     });
   </script>
   <script src="{% static 'attendance/js/calendar.js' %}"></script>
