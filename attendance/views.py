@@ -18,6 +18,8 @@ from django.core import signing
 from functools import wraps
 from django.conf import settings
 
+from .services.timeir_holidays import crawl_years
+
 from .jalali import (
     JALALI_MONTH_NAMES,
     WEEKDAY_NAMES,
@@ -599,6 +601,7 @@ def management_dashboard(request):
     work_days = WorkDay.objects.filter(
         user_id__in=employee_ids,
         date__range=(m['start_date'], m['end_date']),
+        approval_status=WorkDay.APPROVAL_APPROVED,
     ).order_by('user_id', 'date')
     stats_by_user = {employee_id: _compute_stats([]) for employee_id in employee_ids}
     approval_by_user = {employee_id: {'pending': 0, 'approved': 0, 'rejected': 0} for employee_id in employee_ids}
@@ -635,6 +638,98 @@ def management_dashboard(request):
         'can_approve': _management_permission(manager, 'workdays_approve'),
     })
 
+
+def _holiday_management_years():
+    today_jy, _, _ = today_jalali()
+    return list(range(today_jy, today_jy + 3))
+
+
+@management_permission_required('holidays')
+def management_holidays(request):
+    today_jy, _, _ = today_jalali()
+    try:
+        selected_year = int(request.GET.get('year', today_jy))
+    except (TypeError, ValueError):
+        selected_year = today_jy
+    if selected_year < 1300 or selected_year > 1600:
+        selected_year = today_jy
+
+    holidays = Holiday.objects.filter(
+        Q(jalali_year=None) | Q(jalali_year=selected_year)
+    ).order_by('jalali_month', 'jalali_day', 'title')
+    return render(request, 'attendance/management/holidays.html', {
+        'holidays': holidays,
+        'selected_year': selected_year,
+        'years': _holiday_management_years(),
+    })
+
+
+@management_permission_required('holidays')
+@require_POST
+def management_add_holiday(request):
+    date_raw = (request.POST.get('date') or '').strip()
+    title = (request.POST.get('title') or '').strip()
+    kind = (request.POST.get('kind') or '').strip()
+    if kind not in {Holiday.KIND_OFFICIAL, Holiday.KIND_GOVERNMENT}:
+        messages.error(request, 'نوع تعطیلی نامعتبر است.')
+        return redirect('management_holidays')
+    if not title:
+        messages.error(request, 'عنوان تعطیلی را وارد کنید.')
+        return redirect('management_holidays')
+    try:
+        parsed = _parse_user_date(date_raw)
+        jy, jm, jd = gregorian_to_jalali(parsed.year, parsed.month, parsed.day)
+    except ValueError:
+        messages.error(request, 'تاریخ شمسی نامعتبر است.')
+        return redirect('management_holidays')
+
+    Holiday.objects.create(
+        title=title[:200], kind=kind,
+        jalali_month=jm, jalali_day=jd, jalali_year=jy,
+    )
+    messages.success(request, 'تعطیلی با موفقیت ثبت شد.')
+    return redirect(f"{reverse('management_holidays')}?year={jy}")
+
+
+@management_permission_required('holidays')
+@require_POST
+def management_sync_holidays(request):
+    years = _holiday_management_years()
+    try:
+        rows = crawl_years(years)
+    except Exception as exc:
+        messages.error(request, f'همگام‌سازی تعطیلات رسمی انجام نشد: {exc}')
+        return redirect('management_holidays')
+
+    created = 0
+    updated = 0
+    for row in rows:
+        defaults = {'title': row['title'], 'kind': Holiday.KIND_OFFICIAL}
+        obj = Holiday.objects.filter(
+            jalali_year=row['year'], jalali_month=row['month'],
+            jalali_day=row['day'], kind=Holiday.KIND_OFFICIAL,
+        ).first()
+        if obj is None:
+            Holiday.objects.create(
+                jalali_year=row['year'], jalali_month=row['month'],
+                jalali_day=row['day'], **defaults,
+            )
+            created += 1
+        else:
+            changed = False
+            if obj.title != row['title']:
+                obj.title = row['title']; changed = True
+            if obj.kind != Holiday.KIND_OFFICIAL:
+                obj.kind = Holiday.KIND_OFFICIAL; changed = True
+            if changed:
+                obj.save(update_fields=['title', 'kind'])
+                updated += 1
+
+    messages.success(
+        request,
+        f'همگام‌سازی تعطیلات رسمی انجام شد: {len(rows)} مورد دریافت شد؛ {created} مورد جدید و {updated} مورد اصلاح شد.',
+    )
+    return redirect('management_holidays')
 
 @management_permission_required('employees')
 def management_employees(request):

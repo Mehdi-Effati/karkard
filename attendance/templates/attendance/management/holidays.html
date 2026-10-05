@@ -1,0 +1,39 @@
+{% extends 'attendance/management_base.html' %}
+{% load static %}
+{% block title %}مدیریت تعطیلات{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">تقویم سازمان</span><h1>مدیریت تعطیلات</h1><p>تعطیلات دستی را ثبت کنید یا تعطیلات رسمی را از time.ir همگام‌سازی کنید.</p></div>
+</div>
+
+{% if messages %}<div class="holiday-messages">{% for message in messages %}<div class="holiday-message {{message.tags}}">{{message}}</div>{% endfor %}</div>{% endif %}
+
+<div class="holiday-management-grid">
+  <section class="management-panel holiday-panel">
+    <div class="section-head"><div><h2>۱. افزودن دستی تعطیلی</h2><p>برای تعطیلی‌هایی که هنوز منبع Sync آن‌ها را ندارید، مثل اعلام تعطیلی دولت در همان روز.</p></div></div>
+    <form method="post" action="{% url 'management_add_holiday' %}" class="holiday-form">
+      {% csrf_token %}
+      <input class="jalali-date-input" name="date" placeholder="تاریخ شمسی؛ مثلاً ۱۴۰۵/۰۷/۱۲ *" inputmode="numeric" autocomplete="off" required>
+      <input name="title" placeholder="عنوان تعطیلی؛ مثلاً تعطیلی سراسری *" maxlength="200" required>
+      <select name="kind" required><option value="official">تعطیل رسمی</option><option value="government">تعطیلی اعلامی دولت</option></select>
+      <button class="primary" type="submit">ثبت تعطیلی</button>
+    </form>
+  </section>
+
+  <section class="management-panel holiday-panel">
+    <div class="section-head"><div><h2>۲. Sync تعطیلات رسمی</h2><p>با فشردن دکمه، سال جاری شمسی و دو سال آینده از time.ir دریافت می‌شوند. Sync خودکار انجام نمی‌شود.</p></div></div>
+    <form method="post" action="{% url 'management_sync_holidays' %}">{% csrf_token %}<button class="primary sync-button" type="submit">🔄 همگام‌سازی تعطیلات رسمی</button></form>
+    <p class="hint sync-hint">اگر ساختار یا دسترسی time.ir تغییر کرده باشد، هیچ داده خالی به‌عنوان Sync موفق ذخیره نمی‌شود.</p>
+  </section>
+</div>
+
+<div class="toolbar holiday-toolbar">
+  <form method="get"><select name="year" onchange="this.form.submit()">{% for year in years %}<option value="{{year}}" {% if year == selected_year %}selected{% endif %}>{{year}}</option>{% endfor %}</select></form>
+  <strong>تعطیلات سال {{selected_year}}</strong>
+</div>
+
+<div class="table-card"><table class="holiday-table"><thead><tr><th>تاریخ شمسی</th><th>عنوان</th><th>نوع</th><th>منبع</th></tr></thead><tbody>
+{% for holiday in holidays %}<tr><td>{{selected_year}}/{{holiday.jalali_month|stringformat:'02d'}}/{{holiday.jalali_day|stringformat:'02d'}}{% if not holiday.jalali_year %}<small> · تکرارشونده</small>{% endif %}</td><td>{{holiday.title}}</td><td><span class="holiday-kind {{holiday.kind}}">{{holiday.get_kind_display}}</span></td><td>{% if holiday.jalali_year %}ثبت‌شده/Sync شده{% else %}تعطیلی ثابت پروژه{% endif %}</td></tr>{% empty %}<tr><td colspan="4" class="empty">برای این سال تعطیلی ثبت نشده است.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}
+{% block extra_js %}{% endblock %}

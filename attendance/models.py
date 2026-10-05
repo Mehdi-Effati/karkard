@@ -12,6 +12,7 @@ MANAGEMENT_PERMISSION_CHOICES = [
     ('deductions', 'ثبت و مدیریت کسر حقوق'),
     ('employees_create', 'افزودن کارمند جدید'),
     ('payroll', 'گزارش کارکرد (حسابداری)'),
+    ('holidays', 'مدیریت تعطیلات'),
 ]
 MANAGEMENT_PERMISSION_KEYS = tuple(key for key, _label in MANAGEMENT_PERMISSION_CHOICES)
 
